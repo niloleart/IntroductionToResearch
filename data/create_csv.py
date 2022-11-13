@@ -84,13 +84,4 @@ class CreateCSV:
 
         write_csv(label_list, left_eyes_paths, right_eyes_paths, dir_list)
 
-        # for dirIdx, (dirpath, dirnames, filenames) in enumerate(os.walk(DATABASE_PATH)):
-        #     for filename in filenames:
-        #         if is_image_file(filename):
-        #             paths_list.append(os.path.join(dirpath, filename))
-        #             label_list.append(in_labels.values[dirIdx - 1][2])
-        #             eye_list.append(get_eye(filename))
-        #             dir_list.append(get_folder_name(dirpath))
-        # write_csv(label_list, paths_list, eye_list, dir_list)
-
         return IMAGES_AND_LABELS_FILE_PATH
