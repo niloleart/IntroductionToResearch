@@ -17,15 +17,34 @@ def get_eyes_paths(df):
         print("Folder: ", df.iloc[:, 3], "does not have both eyes image")
 
 
+data_transforms = {
+    'train': transforms.Compose([
+        transforms.RandomResizedCrop([330, 506]),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ]),
+    'val': transforms.Compose([
+        transforms.Resize([330, 506]),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ]),
+}
+
+
 class MaratoCustomDataset(Dataset):
 
     def __init__(self, csv_path, transform=None, target_transform=None):
         df = pd.read_csv(csv_path, index_col=False, header=None, squeeze=True)
-        self.left_eye_dir = df.iloc[:, 0]
-        self.right_eye_dir = df.iloc[:, 1]
-        self.img_labels = df.iloc[:, 2]
-        self.folder = df.iloc[:, 3]
+
+        # TODO: mirar què es pot fer en comptes de petarnos tota la fila a lo loco
+        df_updated = df.dropna(axis=0)
+
+        self.left_eye_dir = df_updated.iloc[:, 0]
+        self.right_eye_dir = df_updated.iloc[:, 1]
+        self.img_labels = df_updated.iloc[:, 4]
+        self.folder = df_updated.iloc[:, 5]
         self.transform = transforms.Compose([
+            transforms.Resize([330, 506]),
             transforms.ToPILImage(),
             transforms.PILToTensor()
         ])
