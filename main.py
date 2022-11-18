@@ -4,7 +4,7 @@ from torchvision.transforms import ToTensor
 
 from data.create_csv import CreateCSV
 from data.load_data import MaratoCustomDataset
-from data.plot_data import plot_sample_data
+from data.plot_data import plot_sample_data, plot_losses
 from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
 import torch
@@ -93,31 +93,63 @@ def get_csv_path():
         return CSV_REMOTE_PATH
 
 
+def get_device():
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
 def get_pretrained_model():
-    model = models.resnet18(pretrained=True)
-    for param in model.parameters():
-        param.requires_grad = False
+    device = get_device()
 
-    num_ftrs = model.fc.in_features
-    model.fc = nn.Linear(num_ftrs, 2)
+    pretrained_model = models.vgg16(pretrained=True)
+    pretrained_model.to(device)
+    feature_extractor = pretrained_model.features
+    print(feature_extractor)
 
-    criterion = nn.CrossEntropyLoss()
+    for layer in feature_extractor[:24]:  # Freeze layers 0 to 23
+        for param in layer.parameters():
+            param.requires_grad = False
 
-    optimizer_ft = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    for layer in feature_extractor[24:]:  # Train layers 24 to 30
+        for param in layer.parameters():
+            param.requires_grad = True
+
+    # TODO: canviar tamany entrada i veure si sigmoid o q fem
+    feature_classifier = nn.Sequential(
+        nn.Linear(158720, 256),
+        nn.ReLU(),
+        nn.Dropout(p=0.5),
+        nn.Linear(256, 1),
+        nn.Sigmoid()
+    )
+
+    feature_classifier.to(device)
+
+    model = nn.Sequential(
+        feature_extractor,
+        nn.Flatten(),
+        feature_classifier
+    )
+    model.to(device)
+
+    loss_fn = nn.BCELoss()
+
+    optimizer_ft = optim.Adam(model.parameters(), lr=hparams['learning_rate'])
 
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
 
-    return model, criterion, optimizer_ft, exp_lr_scheduler
+    return model, loss_fn, optimizer_ft, exp_lr_scheduler
 
 
 def train(dataset):
     set_seed(hparams['seed'])
 
-    train_loaders, dataset_sizes = get_dataloaders(dataset)
+    data_loaders, dataset_sizes = get_dataloaders(dataset)
 
-    model_ft, criterion, optimizer_ft, exp_lr_scheduler = get_pretrained_model()
+    model_ft, loss_fn, optimizer_ft, exp_lr_scheduler = get_pretrained_model()
 
-    train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, train_loaders, dataset_sizes)
+    train_acc, train_loss, val_acc, val_loss = train_model(model_ft, loss_fn, optimizer_ft, exp_lr_scheduler, data_loaders, dataset_sizes)
+
+    plot_losses(train_acc, val_acc, train_loss, val_loss)
 
 
 def main():

@@ -5,6 +5,7 @@ import pandas as pd
 from torch.utils.data import Dataset
 from torchvision.io import read_image
 from torchvision.transforms import transforms
+import torch
 
 
 def get_eyes_paths(df):
@@ -19,12 +20,12 @@ def get_eyes_paths(df):
 
 data_transforms = {
     'train': transforms.Compose([
-        transforms.RandomResizedCrop([330, 506]),
+        # transforms.RandomResizedCrop([330, 506]),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ]),
     'val': transforms.Compose([
-        transforms.Resize([330, 506]),
+        # transforms.Resize([330, 506]),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ]),
@@ -44,7 +45,7 @@ class MaratoCustomDataset(Dataset):
         self.img_labels = df_updated.iloc[:, 4]
         self.folder = df_updated.iloc[:, 5]
         self.transform = transforms.Compose([
-            transforms.Resize([330, 506]),
+            transforms.Resize([335, 506]),
             transforms.ToPILImage(),
             transforms.PILToTensor()
         ])
@@ -65,6 +66,9 @@ class MaratoCustomDataset(Dataset):
 
             right_image = self.transform(right_image)
             right_image = right_image.permute(1, 2, 0)
+
+            composed_image = torch.cat([left_image, right_image], 1)
+
         if self.target_transform:
             label = self.target_transform(label)
-        return [left_image, right_image], label, folder
+        return composed_image, label, folder
