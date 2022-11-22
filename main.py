@@ -39,19 +39,19 @@ CSV_REMOTE_PATH = '/home/niloleart/images_paths_and_labels.csv'
 
 hparams = {
     'seed': 123,
-    'batch_size': 2,
-    'num_epochs': 10,
+    'batch_size': 32,
+    'num_epochs': 30,
     'test_batch_size': 2,
     'num_classes': 2,
     'learning_rate': 1e-4,
     'validation_split': .2,
-    'test_split': .2,
+    'test_split': .0,
     'shuffle_dataset': True
 }
 
 rparams = {
     'create_csv': False,
-    'plot_data_sample': False,
+    'plot_data_sample': True,
     'local_mode': False,
     'do_train': True
 }
@@ -113,9 +113,14 @@ def get_pretrained_model():
         for param in layer.parameters():
             param.requires_grad = True
 
-    # TODO: canviar tamany entrada i veure si sigmoid o q fem
     feature_classifier = nn.Sequential(
-        nn.Linear(158720, 256),
+        nn.Linear(158720, 512),
+        nn.ReLU(),
+        nn.Dropout(p=0.5),
+        nn.Linear(512, 256),
+        nn.ReLU(),
+        nn.Dropout(p=0.5),
+        nn.Linear(256, 256),
         nn.ReLU(),
         nn.Dropout(p=0.5),
         nn.Linear(256, 1),
@@ -141,13 +146,13 @@ def get_pretrained_model():
 
 
 def train(dataset):
-    set_seed(hparams['seed'])
+    # set_seed(hparams['seed'])
 
     data_loaders, dataset_sizes = get_dataloaders(dataset)
 
     model_ft, loss_fn, optimizer_ft, exp_lr_scheduler = get_pretrained_model()
 
-    train_acc, train_loss, val_acc, val_loss = train_model(model_ft, loss_fn, optimizer_ft, exp_lr_scheduler, data_loaders, dataset_sizes)
+    train_acc, train_loss, val_acc, val_loss = train_model(model_ft, loss_fn, optimizer_ft, exp_lr_scheduler, data_loaders, dataset_sizes, hparams['num_epochs'])
 
     plot_losses(train_acc, val_acc, train_loss, val_loss)
 

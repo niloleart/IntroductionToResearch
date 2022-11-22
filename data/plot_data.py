@@ -4,22 +4,18 @@ import torch
 
 
 def plot_sample_data(data):
-    figure = plt.figure(figsize=(8, 8))
-    cols, rows = 2, 3
-    num_rows = ((cols * rows) // 2) + 1
-    aux = 1
-    for i in range(1, num_rows):
+    figure = plt.figure(figsize=(8, 12))
+    num_rows = 4
+    num_cols = 1
+    for i in range(1, num_rows*num_cols + 1):
         sample_idx = torch.randint(len(data), size=(1,)).item()
-        imgs, label, folder = data[sample_idx]
-        # for imgIdx, img in enumerate(imgs):
-        figure.add_subplot(rows, cols, aux)
-        im = np.squeeze(imgs)
-            # title = ['Folder', str(folder), '-', get_eye(imgIdx), '-', get_class(label) + '(' + str(label) + ')']
-        # plt.title(' '.join(title))
-        # plt.xlabel(' Label' + str(label))
-        # plt.axis("off")
-        #     plt.imshow(im)
-        #     aux += 1
+        img, label, folder = data[sample_idx]
+        im = np.squeeze(img)
+        figure.add_subplot(num_rows, num_cols, i)
+        title = ['Folder', str(folder), '-', get_class(label) + '(' + str(int(label)) + ')']
+        plt.title(' '.join(title))
+        plt.xlabel(' Label' + str(label))
+        plt.axis("off")
         plt.imshow(im)
     plt.show()
 
