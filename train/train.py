@@ -23,8 +23,7 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def train_model(model, loss_fn, optimizer, scheduler, dataloaders, dataset_sizes, num_epochs=25):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def train_model(model, loss_fn, optimizer, scheduler, dataloaders, dataset_sizes, device, num_epochs=25):
     train_accuracies, train_losses, val_accuracies, val_losses = [], [], [], []
     val_loss = AverageMeter()
     val_accuracy = AverageMeter()
@@ -44,12 +43,14 @@ def train_model(model, loss_fn, optimizer, scheduler, dataloaders, dataset_sizes
             data = torch.permute(data, (0, 3, 1, 2))
             train_loop.set_description('[TRAIN] Epoch {}/{}'.format(epoch + 1, num_epochs))
             data, target = data.float().to(device), target.float().to(device)
-            target = target.unsqueeze(-1)  # TODO: fa falta? same a baix
+            # target = target.unsqueeze(-1)  # Fa falta per passar de [X] a [X,1]
+
             optimizer.zero_grad()
             output = model(data)
             loss = loss_fn(output, target)
             loss.backward()
             optimizer.step()
+
 
             train_loss.update(loss.item(), n=len(target))
             pred = output.round()  # get prediction
@@ -70,7 +71,8 @@ def train_model(model, loss_fn, optimizer, scheduler, dataloaders, dataset_sizes
                 data = torch.permute(data, (0, 3, 1, 2))
                 val_loop.set_description('[VAL] Epoch {}/{}'.format(epoch + 1, num_epochs))
                 data, target = data.float().to(device), target.float().to(device)
-                target = target.unsqueeze(-1) # TODO: fa falta?
+                # target = target.unsqueeze(-1)
+
                 output = model(data)
                 loss = loss_fn(output, target)
                 val_loss.update(loss.item(), n=len(target))

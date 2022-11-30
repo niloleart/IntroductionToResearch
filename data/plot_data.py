@@ -12,7 +12,7 @@ def plot_sample_data(data):
         img, label, folder = data[sample_idx]
         im = np.squeeze(img)
         figure.add_subplot(num_rows, num_cols, i)
-        title = ['Folder', str(folder), '-', get_class(label) + '(' + str(int(label)) + ')']
+        title = ['Folder', str(folder), '-', get_class(label[0]) + '(' + str(int(label[0])) + ')']
         plt.title(' '.join(title))
         plt.xlabel(' Label' + str(label))
         plt.axis("off")

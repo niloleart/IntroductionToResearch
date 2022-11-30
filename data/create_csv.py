@@ -8,7 +8,8 @@ from operator import itemgetter
 IMAGE_DATABASE_LOCAL_PATH = "/Users/niloleart/PycharmProjects/mini_dataset"
 IMAGE_DATABASE_REMOTE_PATH = "/home/niloleart/fbm_mntdir/database/UPC - IMAGENES MARATO - ANONIMIZADAS"
 
-ANNOTATIONS_CSV_LOCAL_FILE = "/Users/niloleart/PycharmProjects/mini_labels.csv"
+ANNOTATIONS_CSV_LOCAL_FILE = "/Users/niloleart/PycharmProjects/mini_labels.csv"  # TODO: uncomment
+# ANNOTATIONS_CSV_LOCAL_FILE = "/Users/niloleart/PycharmProjects/mini_labels_imbalance.csv"
 ANNOTATIONS_CSV_REMOTE_FILE = "/home/niloleart/full_dataset.csv"
 
 IMAGES_AND_LABELS_FILE_LOCAL_PATH = "/Users/niloleart/PycharmProjects/test.csv"
@@ -24,7 +25,8 @@ images_type = {
 }
 IMAGE_TYPE_MACULAR_CUBE = "macular"
 
-CSV_DELIMITER = ','
+CSV_DELIMITER = ','  # For remote
+# CSV_DELIMITER = ';'  # For local
 
 
 def is_image_file(filename):
