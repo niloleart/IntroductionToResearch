@@ -9,12 +9,12 @@ def plot_sample_data(data):
     num_cols = 1
     for i in range(1, num_rows*num_cols + 1):
         sample_idx = torch.randint(len(data), size=(1,)).item()
-        img, label, folder = data[sample_idx]
+        img, label_not_one_hot, label, folder = data[sample_idx]
         im = np.squeeze(img)
         figure.add_subplot(num_rows, num_cols, i)
-        title = ['Folder', str(folder), '-', get_class(label[0]) + '(' + str(int(label[0])) + ')']
+        title = ['Folder', str(folder), '-', get_class(label_not_one_hot) + '(' + str(int(label_not_one_hot)) + ')']
         plt.title(' '.join(title))
-        plt.xlabel(' Label' + str(label))
+        plt.xlabel(' Label' + str(label_not_one_hot))
         plt.axis("off")
         plt.imshow(im)
     plt.show()
@@ -34,7 +34,7 @@ def get_class(label):
         return 'Ill'
 
 
-def plot_losses(train_acc, val_acc, train_loss, val_loss):
+def plot_losses(train_loss, train_acc, val_loss, val_acc):
     epochs = range(len(train_acc))
 
     plt.plot(epochs, train_acc, 'b', label='Training acc')

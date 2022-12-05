@@ -4,16 +4,18 @@ from torch.utils.data import Dataset
 from torchvision.io import read_image
 from torchvision.transforms import transforms
 import torch
+import numpy as np
 
 data_transforms = {
     'train': transforms.Compose([
         transforms.RandomResizedCrop([335, 506]),
-        transforms.ToTensor(),
-        transforms.Normalize([24.3918, 56.5434, 53.6119], [33.7875, 35.7010, 57.2551])
+        transforms.RandomRotation(degrees=(-30, 30)),
+        transforms.ToTensor()
+        # transforms.Normalize([24.3918, 56.5434, 53.6119], [33.7875, 35.7010, 57.2551])
     ]),
     'val': transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize([24.3918, 56.5434, 53.6119], [33.7875, 35.7010, 57.2551])
+        transforms.ToTensor()
+        # transforms.Normalize([24.3918, 56.5434, 53.6119], [33.7875, 35.7010, 57.2551])
     ]),
 }
 
@@ -40,22 +42,41 @@ def compute_data_metrics(dataloader):
     return mean, std
 
 
+def get_data(csv_path):
+    columns = ['left_macular', 'right_macular', 'left_color', 'right_color', 'folder', 'label']
+
+    df = pd.read_csv(csv_path, sep=",", index_col=False, squeeze=True)
+
+    # TODO: mirar què es pot fer en comptes de petar-nos tota la fila a lo loco
+    df = df.dropna(axis=0)
+
+    df = df.loc[:, columns]  # https://builtin.com/data-science/train-test-split
+    df.head(len(df))
+    features = ['left_macular', 'right_macular', 'left_color', 'right_color', 'folder']
+
+    X = df.loc[:, features]
+    y = df.loc[:, 'label']
+
+    return X, y
+
+
 class MaratoCustomDataset(Dataset):
 
-    def __init__(self, csv_path, transform=None, target_transform=None):
+    def __init__(self, X, y, transform=None, target_transform=None):
         # df = pd.read_csv(csv_path, sep=";", index_col=False, header=None, squeeze=True)
-        df = pd.read_csv(csv_path, sep=",", index_col=False, header=None, squeeze=True)
 
-        # TODO: mirar què es pot fer en comptes de petar-nos tota la fila a lo loco
-        df_updated = df.dropna(axis=0)
-
-        self.left_eye_dir = df_updated.iloc[:, 0]
+        self.left_eye_dir = X.iloc[:]['left_macular']
         # self.left_eye_dir = df_updated.iloc[:, 2]
-        self.right_eye_dir = df_updated.iloc[:, 1]
+        self.right_eye_dir = X.iloc[:]['right_macular']
         # self.right_eye_dir = df_updated.iloc[:, 3]
-        self.img_labels_not_one_hot = df_updated.iloc[:, 4]
-        self.img_labels = torch.nn.functional.one_hot((torch.tensor(self.img_labels_not_one_hot.values)).type(torch.int64))
-        self.folder = df_updated.iloc[:, 5]
+
+        self.folder = X.iloc[:]['folder']
+        self.img_labels_not_one_hot = y
+        self.img_labels = torch.nn.functional.one_hot(
+            torch.from_numpy(
+                self.img_labels_not_one_hot.values
+            ).to(torch.int64), num_classes=2
+        )
 
         # TODO: s'ha de normalitzar?
         self.transform = transforms.Compose([
@@ -93,4 +114,4 @@ class MaratoCustomDataset(Dataset):
         if self.target_transform:
             label = self.target_transform(label)
             label_not_one_hot = self.target_transform(label_not_one_hot)
-        return composed_image, label, folder
+        return composed_image, label_not_one_hot, label, folder

@@ -50,16 +50,19 @@ def get_writer(local_mode):
 
 def write_csv(labels, left_eye_paths, right_eyes_paths, color_left_eyes_paths, color_right_eyes_paths, folder,
               local_mode):
+    header = ['left_macular', 'right_macular', 'left_color', 'right_color', 'folder', 'label']
     try:
         f, writer = get_writer(local_mode)
-
+        writer.writerow(header)
         for index, label in enumerate(labels):
             writer.writerow([left_eye_paths[index], right_eyes_paths[index], color_left_eyes_paths[index],
-                             color_right_eyes_paths[index], label, folder[index]])
+                             color_right_eyes_paths[index], folder[index], label])
         f.close()
         print("Successfully writen", len(labels), "labels and paths into", get_path_to_write_csv(local_mode))
     except Exception as e:
         print("There has been an error writing csv!")
+
+    csv.DictWriter(open(get_path_to_write_csv(local_mode), 'a'), header)
 
 
 def get_folder_name(path):
