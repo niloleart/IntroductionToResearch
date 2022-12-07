@@ -5,13 +5,14 @@ import torch
 
 def plot_sample_data(data):
     figure = plt.figure(figsize=(8, 12))
-    num_rows = 4
-    num_cols = 1
+    num_rows = 5
+    num_cols = 2
     for i in range(1, num_rows*num_cols + 1):
         sample_idx = torch.randint(len(data), size=(1,)).item()
         img, label_not_one_hot, label, folder = data[sample_idx]
         im = np.squeeze(img)
         figure.add_subplot(num_rows, num_cols, i)
+        # TODO: afegir OD/OS
         title = ['Folder', str(folder), '-', get_class(label_not_one_hot) + '(' + str(int(label_not_one_hot)) + ')']
         plt.title(' '.join(title))
         plt.xlabel(' Label' + str(label_not_one_hot))
@@ -28,9 +29,9 @@ def get_eye(index):
 
 
 def get_class(label):
-    if label == 0:
+    if label[0] == 0:
         return 'Healthy'
-    elif label == 1:
+    elif label[0] == 1:
         return 'Ill'
 
 

@@ -43,7 +43,7 @@ def compute_data_metrics(dataloader):
 
 
 def get_data(csv_path):
-    columns = ['left_macular', 'right_macular', 'left_color', 'right_color', 'folder', 'label']
+    columns = ['left_macular', 'right_macular', 'left_color', 'right_color', 'folder', 'label_left', 'label_right']
 
     df = pd.read_csv(csv_path, sep=",", index_col=False, squeeze=True)
 
@@ -53,22 +53,48 @@ def get_data(csv_path):
     df = df.loc[:, columns]  # https://builtin.com/data-science/train-test-split
     df.head(len(df))
     features = ['left_macular', 'right_macular', 'left_color', 'right_color', 'folder']
+    labels = ['label_left', 'label_right']
 
     X = df.loc[:, features]
-    y = df.loc[:, 'label']
+    y = df.loc[:, labels]
 
     return X, y
+
+
+def get_data_formatted(X_train, X_test, y_train, y_test):
+    X_train_macular = pd.concat((X_train.iloc[:, 0], X_train.iloc[:, 1]), axis=0)
+    X_train_color = pd.concat((X_train.iloc[:, 2], X_train.iloc[:, 3]), axis=0)
+    X_train_folders = pd.concat((X_train.iloc[:, 4], X_train.iloc[:, 4]), axis=0)
+    y_train_concat = pd.concat((y_train.iloc[:, 0], y_train.iloc[:, 1]), axis=0)
+
+    dict_X_train = {'macular': X_train_macular, 'color': X_train_color, 'folder': X_train_folders}
+    X_train_out = pd.DataFrame(dict_X_train)
+
+    y_train_dict = {'labels': y_train_concat}
+    # Y_train_out = pd.DataFrame(y_train_dict)
+    Y_train_out = y_train_concat
+
+    X_test_macular = pd.concat((X_test.iloc[:, 0], X_test.iloc[:, 1]), axis=0)
+    X_test_color = pd.concat((X_test.iloc[:, 2], X_test.iloc[:, 3]), axis=0)
+    X_test_folders = pd.concat((X_test.iloc[:, 4], X_test.iloc[:, 4]), axis=0)
+    y_test_concat = pd.concat((y_test.iloc[:, 0], y_test.iloc[:, 1]), axis=0)
+
+    dict_X_test = {'macular': X_test_macular, 'color': X_test_color, 'folder': X_test_folders}
+    X_test_out = pd.DataFrame(dict_X_test)
+
+    y_test_dict = {'labels': y_test_concat}
+    # Y_test_out = pd.DataFrame(y_test_dict)
+    Y_test_out = y_test_concat
+
+    return X_train_out, X_test_out, Y_train_out, Y_test_out
 
 
 class MaratoCustomDataset(Dataset):
 
     def __init__(self, X, y, transform=None, target_transform=None):
-        # df = pd.read_csv(csv_path, sep=";", index_col=False, header=None, squeeze=True)
 
-        self.left_eye_dir = X.iloc[:]['left_macular']
-        # self.left_eye_dir = df_updated.iloc[:, 2]
-        self.right_eye_dir = X.iloc[:]['right_macular']
-        # self.right_eye_dir = df_updated.iloc[:, 3]
+        # self.img_eye = X.iloc[:]['macular']
+        self.img_eye = X.iloc[:]['color']
 
         self.folder = X.iloc[:]['folder']
         self.img_labels_not_one_hot = y
@@ -91,27 +117,19 @@ class MaratoCustomDataset(Dataset):
         return len(self.img_labels)
 
     def __getitem__(self, idx):
-        # left_image = read_image(self.left_eye_dir.iloc[idx])
-        left_image = cv2.imread(self.left_eye_dir.iloc[idx], 1)
-        left_image = cv2.cvtColor(left_image, cv2.COLOR_BGR2RGB)
+        img = cv2.imread(self.img_eye.iloc[idx], 1)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        # right_image = read_image(self.right_eye_dir.iloc[idx])
-        right_image = cv2.imread(self.right_eye_dir.iloc[idx], 1)
-        right_image = cv2.cvtColor(right_image, cv2.COLOR_BGR2RGB)
+
         label = self.img_labels[idx]
         label_not_one_hot = self.img_labels_not_one_hot.iloc[idx]
         folder = self.folder.iloc[idx]
 
         if self.transform:
-            left_image = self.transform(left_image)
-            left_image = left_image.permute(1, 2, 0)
-
-            right_image = self.transform(right_image)
-            right_image = right_image.permute(1, 2, 0)
-
-            composed_image = torch.cat([left_image, right_image], 1)
+            img = self.transform(img)
+            img = img.permute(1, 2, 0)
 
         if self.target_transform:
             label = self.target_transform(label)
             label_not_one_hot = self.target_transform(label_not_one_hot)
-        return composed_image, label_not_one_hot, label, folder
+        return img, label_not_one_hot, label, folder

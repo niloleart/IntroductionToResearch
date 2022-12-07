@@ -10,7 +10,8 @@ IMAGE_DATABASE_REMOTE_PATH = "/home/niloleart/fbm_mntdir/database/UPC - IMAGENES
 
 ANNOTATIONS_CSV_LOCAL_FILE = "/Users/niloleart/PycharmProjects/mini_labels.csv"  # TODO: uncomment
 # ANNOTATIONS_CSV_LOCAL_FILE = "/Users/niloleart/PycharmProjects/mini_labels_imbalance.csv"
-ANNOTATIONS_CSV_REMOTE_FILE = "/home/niloleart/full_dataset.csv"
+# ANNOTATIONS_CSV_REMOTE_FILE = "/home/niloleart/full_dataset.csv"
+ANNOTATIONS_CSV_REMOTE_FILE = "/home/niloleart/full_double_labels.csv"
 
 IMAGES_AND_LABELS_FILE_LOCAL_PATH = "/Users/niloleart/PycharmProjects/test.csv"
 IMAGES_AND_LABELS_FILE_REMOTE_PATH = "/home/niloleart/images_paths_and_labels.csv"
@@ -25,8 +26,10 @@ images_type = {
 }
 IMAGE_TYPE_MACULAR_CUBE = "macular"
 
-CSV_DELIMITER = ','  # For remote
-# CSV_DELIMITER = ';'  # For local
+# CSV_DELIMITER = ','  # For remote
+
+
+CSV_DELIMITER = ';'  # For local
 
 
 def is_image_file(filename):
@@ -48,17 +51,17 @@ def get_writer(local_mode):
     return f, writer
 
 
-def write_csv(labels, left_eye_paths, right_eyes_paths, color_left_eyes_paths, color_right_eyes_paths, folder,
+def write_csv(labels_left, labels_right, left_eye_paths, right_eyes_paths, color_left_eyes_paths, color_right_eyes_paths, folder,
               local_mode):
-    header = ['left_macular', 'right_macular', 'left_color', 'right_color', 'folder', 'label']
+    header = ['left_macular', 'right_macular', 'left_color', 'right_color', 'folder', 'label_left', 'label_right']
     try:
         f, writer = get_writer(local_mode)
         writer.writerow(header)
-        for index, label in enumerate(labels):
+        for index, label in enumerate(labels_right):
             writer.writerow([left_eye_paths[index], right_eyes_paths[index], color_left_eyes_paths[index],
-                             color_right_eyes_paths[index], folder[index], label])
+                             color_right_eyes_paths[index], folder[index], labels_left[index], labels_right[index]])
         f.close()
-        print("Successfully writen", len(labels), "labels and paths into", get_path_to_write_csv(local_mode))
+        print("Successfully writen", len(labels_right), "labels and paths into", get_path_to_write_csv(local_mode))
     except Exception as e:
         print("There has been an error writing csv!")
 
@@ -115,7 +118,8 @@ class CreateCSV:
     @staticmethod
     def create_CSV(mode):
         in_labels = pd.read_csv((open(get_annotations_path(mode))), delimiter=CSV_DELIMITER)
-        label_list = []
+        label_list_right = []
+        label_list_left = []
         dir_list = []
 
         macular_left_eyes_paths = []
@@ -181,10 +185,11 @@ class CreateCSV:
                     angiography_6x6_superficial_left_paths.append(angiography_6x6_superficial_left_eye)
                     angiography_6x6_superficial_right_paths.append(angiography_6x6_superficial_right_eye)
 
-                    label_list.append(label_to_int(in_labels.values[dirIdx - 1][2]))
+                    label_list_right.append(label_to_int(in_labels.values[dirIdx - 1][3]))
+                    label_list_left.append(label_to_int(in_labels.values[dirIdx - 1][4]))
                     dir_list.append(get_folder_name(os.path.join(database_path, folder)))
 
-            write_csv(label_list, macular_left_eyes_paths, macular_right_eyes_paths, color_left_eyes_paths,
+            write_csv(label_list_left, label_list_right, macular_left_eyes_paths, macular_right_eyes_paths, color_left_eyes_paths,
                       color_right_eyes_paths, dir_list, mode)
 
         return get_path_to_write_csv(mode)

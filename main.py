@@ -4,13 +4,14 @@ from torchvision.models import VGG16_Weights
 from torchvision.transforms import ToTensor
 
 from data.create_csv import CreateCSV
-from data.load_data import MaratoCustomDataset, compute_data_metrics, get_data, data_transforms
+from data.load_data import MaratoCustomDataset, compute_data_metrics, get_data, data_transforms, get_data_formatted
 from data.plot_data import plot_sample_data, plot_losses
 from torch.utils.data.sampler import SubsetRandomSampler
 from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
 import torch
 import torchvision.models as models
+import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from train.train import train_model
@@ -54,9 +55,10 @@ hparams = {
 
 rparams = {
     'create_csv': False,
-    'plot_data_sample': True,
+    'plot_data_sample': False,
     'local_mode': False,
-    'do_train': True
+    'do_train': True,
+    'feature_extracting': False  # False = finetune whole model, True = only update last layers (classifier)
 }
 
 
@@ -95,18 +97,18 @@ def get_device():
 
 def get_VGG_classifier():
     return nn.Sequential(
-        nn.Linear(158720, 512),
-        nn.ReLU(),
-        nn.Dropout(p=0.5),
-        nn.Linear(512, 256),
-        nn.ReLU(),
-        nn.Dropout(p=0.5),
-        nn.Linear(256, 256),
-        nn.ReLU(),
-        nn.Dropout(p=0.5),
-        nn.Linear(256, 2),  # TODO: és un 1 amb CE? O un 2? Un 1 per BCEWithLogits, un 2 per CELoss
-        nn.Sigmoid()  # No fa falta amb BCE, per dues classes
-        # nn.Softmax()  # per multiclass (https://discuss.pytorch.org/t/vgg-output-layer-no-softmax/9273/6)
+        nn.Linear(158720, 2),
+        # nn.ReLU(),
+        # nn.Dropout(p=0.5),
+        # nn.Linear(512, 256),
+        # nn.ReLU(),
+        # nn.Dropout(p=0.5),
+        # nn.Linear(256, 256),
+        # nn.ReLU(),
+        # nn.Dropout(p=0.5),
+        # nn.Linear(256, 2),  # TODO: és un 1 amb CE? O un 2? Un 1 per BCEWithLogits, un 2 per CELoss
+        # nn.Sigmoid()  # No fa falta amb BCE, per dues classes
+        nn.Softmax(dim=1)  # per multiclass (https://discuss.pytorch.org/t/vgg-output-layer-no-softmax/9273/6)
     )
 
 
@@ -116,9 +118,10 @@ def get_VGG16(device):
 
     feature_extractor.to(device)
 
-    for layer in feature_extractor[:24]:  # Freeze layers 0 to 23
-        for param in layer.parameters():
-            param.requires_grad = False
+    if rparams['feature_extracting']:
+        for layer in feature_extractor[:24]:  # Freeze layers 0 to 23
+            for param in layer.parameters():
+                param.requires_grad = False
 
     for layer in feature_extractor[24:]:  # Train layers 24 to 30
         for param in layer.parameters():
@@ -144,22 +147,24 @@ def get_ResNet50(device):
     # for param in pretrained_model.parameters():
     #     param.requires_grad = False
 
-    for module, param in zip(pretrained_model.modules(), pretrained_model.parameters()):
-        if isinstance(module, nn.BatchNorm2d):
-            param.requires_grad = False
+    if rparams['feature_extracting']:
+        for module, param in zip(pretrained_model.modules(), pretrained_model.parameters()):
+            if isinstance(module, nn.BatchNorm2d):
+                param.requires_grad = False
 
     pretrained_model.fc = nn.Sequential(
-        nn.Linear(num_features, 512),
-        nn.BatchNorm1d(512),
-        nn.ReLU(),
-        nn.Dropout(p=0.5),
-        nn.Linear(512, 256),
-        nn.BatchNorm1d(256),
-        nn.ReLU(),
-        nn.Dropout(p=0.5),
-        nn.Linear(256, 2),  # TODO: és un 1 amb CE? O un 2? Un 1 per BCEWithLogits, un 2 per CELoss
-        nn.Sigmoid()  # No fa falta amb BCE, per dues classes
-        # nn.Softmax()  # per multiclass (https://discuss.pytorch.org/t/vgg-output-layer-no-softmax/9273/6)
+        nn.Linear(num_features, 2),
+        # nn.BatchNorm1d(512),
+        # nn.ReLU(),
+        # nn.Dropout(p=0.5),
+        # nn.Linear(512, 256),
+        # nn.BatchNorm1d(256),
+        # nn.ReLU(),
+        # nn.Dropout(p=0.5),
+        # nn.Linear(256, 2),  # TODO: és un 1 amb CE? O un 2? Un 1 per BCEWithLogits, un 2 per CELoss
+        # nn.Sigmoid()  # No fa falta amb BCE, per dues classes
+        nn.Softmax()
+        # per multiclass (https://discuss.pytorch.org/t/vgg-output-layer-no-softmax/9273/6) TODO: mirar si fer servir la softmax
     )
     pretrained_model.to(device)
 
@@ -174,12 +179,11 @@ def get_pretrained_model(dataset):
 
     labels = dataset.img_labels_not_one_hot
 
-    class_weights = compute_class_weight('balanced', classes=np.unique(labels), y=labels.values)
+    class_weights = compute_class_weight('balanced', classes=np.unique(np.ravel(labels, order='C')), y=np.ravel(labels, order='C'))
     loss_fn = nn.BCELoss(weight=torch.tensor(class_weights)).to(device)
 
     optimizer_ft = optim.Adam(model.parameters(), lr=hparams['learning_rate'])  # TODO: veure que s'ha de fer amb això
     # optimizer_ft = optim.Adam(model.fc.parameters(), lr=hparams['learning_rate'])  #  aquí és només si mantenim les capes q fan feat extraction sempre frozen
-
 
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
 
@@ -191,13 +195,27 @@ def train(dataset):
 
     data_loaders = get_dataloaders(dataset)
 
-    # mean, std = compute_data_metrics(data_loaders)
+    # mean, std = compute_data_metrics(data_loaders)  #  TODO: normalitzar!
 
     model_ft, loss_fn, optimizer_ft, exp_lr_scheduler = get_pretrained_model(dataset['train'])
 
-    model, train_loss, train_acc, val_loss, val_acc = train_model(model_ft, dataset, data_loaders, loss_fn, optimizer_ft, get_device(), hparams['num_epochs'])
+    model, train_loss, train_acc, val_loss, val_acc = train_model(model_ft, dataset, data_loaders, loss_fn,
+                                                                  optimizer_ft, get_device(), hparams['num_epochs'])
 
     plot_losses(train_loss, train_acc, val_loss, val_acc)
+
+
+def create_dataset(X, y):
+    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0, train_size=.75)
+
+    X_train, X_test, Y_train, Y_test = get_data_formatted(X_train, X_test, y_train, y_test)
+
+    train_dataset = MaratoCustomDataset(X_train, Y_train, data_transforms['train'])
+
+    test_dataset = MaratoCustomDataset(X_test, Y_test, data_transforms['train'])
+
+    dataset = {'train': train_dataset, 'val': test_dataset}
+    return dataset
 
 
 def main():
@@ -213,12 +231,7 @@ def main():
 
     X, y = get_data(annotations_path)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0, train_size=.75)
-
-    train_dataset = MaratoCustomDataset(X_train, y_train, data_transforms['train'])
-    test_dataset = MaratoCustomDataset(X_test, y_test, data_transforms['train'])
-
-    dataset = {'train': train_dataset, 'val': test_dataset}
+    dataset = create_dataset(X, y)
 
     if rparams['plot_data_sample']:
         plot_sample_data(dataset['train'])
