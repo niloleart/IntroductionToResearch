@@ -8,7 +8,8 @@ import numpy as np
 
 data_transforms = {
     'train': transforms.Compose([
-        transforms.RandomResizedCrop([335, 506]),
+        # transforms.RandomResizedCrop([335, 506]),
+        # transforms.CenterCrop([224, 224]), # TODO!
         transforms.RandomRotation(degrees=(-30, 30)),
         transforms.ToTensor()
         # transforms.Normalize([24.3918, 56.5434, 53.6119], [33.7875, 35.7010, 57.2551])

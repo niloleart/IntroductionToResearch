@@ -1,3 +1,5 @@
+import os
+
 from torch import optim, nn
 from torch.optim import lr_scheduler
 from torchvision.models import VGG16_Weights
@@ -44,10 +46,10 @@ CSV_REMOTE_PATH = '/home/niloleart/images_paths_and_labels.csv'
 hparams = {
     'seed': 123,
     'batch_size': 8,
-    'num_epochs': 30,
+    'num_epochs': 50,
     'num_classes': 2,
-    'learning_rate': 1e-3,
-    'learning_rate_fine_tune': 0.0005,
+    'learning_rate': 0.001,
+    'momentum': 0.9,
     'validation_split': .2,
     'test_split': .0,
     'shuffle_dataset': True
@@ -55,13 +57,16 @@ hparams = {
 
 rparams = {
     'create_csv': False,
-    'plot_data_sample': False,
-    'local_mode': False,
+    'plot_data_sample': True,
+    'local_mode': True,
     'do_train': True,
-    'feature_extracting': False  # False = finetune whole model, True = only update last layers (classifier)
+    'feature_extracting': False,  # False = finetune whole model, True = only update last layers (classifier)
+    'model_name': 'alexnet',  # resnet, alexnet, vgg11_bn, squeezenet, densenet
+    'plot_curves': True
 }
 
 
+# Not used
 def set_seed(seed):
     np.random.seed(seed)
     _ = torch.manual_seed(seed)
@@ -93,6 +98,102 @@ def get_csv_path():
 
 def get_device():
     return torch.device('cuda:0' if torch.cuda.is_available() else "cpu")
+
+
+def set_parameter_requires_grad(model, feature_extracting):
+    if feature_extracting:
+        for param in model.parameters():
+            param.requires_grad = False
+
+
+def initialize_model(model_name, feature_extract=False, num_classes=2, use_pretrained=True):
+    model_ft = None
+    input_size = 0
+
+    if model_name == "resnet":
+        """Resnet18
+        """
+
+        model_ft = models.resnet18(pretrained=use_pretrained)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        num_ftrs = model_ft.fc.in_features
+        model_ft.fc = nn.Sequential(
+            nn.Linear(num_ftrs, num_classes),
+            nn.Softmax(dim=1)
+        )
+        input_size = 224
+
+    elif model_name == "alexnet":
+        """ Alexnet
+        """
+        model_ft = models.alexnet(pretrained=use_pretrained)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        num_ftrs = model_ft.classifier[6].in_features
+        model_ft.classifier[6] = nn.Linear(num_ftrs, num_classes)
+        # model_ft.classifier[6] = nn.Sequential(
+        #     nn.Linear(num_ftrs, num_classes)
+            # nn.Softmax(dim=1)
+        # )
+        input_size = 224
+
+    elif model_name == "vgg":
+        """ VGG11_bn
+        """
+        model_ft = models.vgg11_bn(pretrained=use_pretrained)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        num_ftrs = model_ft.classifier[6].in_features
+        model_ft.classifier[6] = nn.Sequential(
+            nn.Linear(num_ftrs, num_classes),
+            nn.Softmax(dim=1)
+        )
+        input_size = 224
+
+    elif model_name == "squeezenet":
+        """ Squeezenet
+        """
+        model_ft = models.squeezenet1_0(pretrained=use_pretrained)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        model_ft.classifier[1] = nn.Sequential(
+            nn.Conv2d(512, num_classes, kernel_size=(1, 1), stride=(1, 1)),
+            nn.Softmax(dim=1)
+        )
+        model_ft.num_classes = num_classes
+        input_size = 224
+
+    elif model_name == "densenet":
+        """ Densenet
+        """
+        model_ft = models.densenet121(pretrained=use_pretrained)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        num_ftrs = model_ft.classifier.in_features
+        model_ft.classifier = nn.Sequential(
+            nn.Linear(num_ftrs, num_classes),
+            nn.Softmax(dim=1)
+        )
+        input_size = 224
+
+    elif model_name == "inception":
+        """ Inception v3
+        Be careful, expects (299,299) sized images and has auxiliary output
+        """
+        model_ft = models.inception_v3(pretrained=use_pretrained)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        # Handle the auxilary net
+        num_ftrs = model_ft.AuxLogits.fc.in_features
+        model_ft.AuxLogits.fc = nn.Linear(num_ftrs, num_classes)
+        # Handle the primary net
+        num_ftrs = model_ft.fc.in_features
+        model_ft.fc = nn.Sequential(
+            nn.Linear(num_ftrs, num_classes),
+            nn.Softmax(dim=1)
+        )
+        input_size = 299
+
+    else:
+        print("Invalid model name, exiting...")
+        exit()
+
+    return model_ft, input_size
 
 
 def get_VGG_classifier():
@@ -171,6 +272,36 @@ def get_ResNet50(device):
     return pretrained_model
 
 
+def get_optimizer_and_loss(model_ft, dataset, feature_extract=rparams['feature_extracting']):
+    model_ft = model_ft.to(get_device())
+
+    params_to_update = model_ft.parameters()
+    print("Params to learn:")
+    if feature_extract:
+        params_to_update = []
+        for name, param in model_ft.named_parameters():
+            if param.requires_grad == True:
+                params_to_update.append(param)
+                print("\t", name)
+    else:
+        for name, param in model_ft.named_parameters():
+            if param.requires_grad == True:
+                print("\t", name)
+
+    optimizer_ft = optim.SGD(params_to_update, hparams['learning_rate'], momentum=hparams['momentum'])
+
+    labels = dataset.img_labels_not_one_hot
+
+    class_weights = compute_class_weight('balanced', classes=np.unique(np.ravel(labels, order='C')),
+                                         y=np.ravel(labels, order='C'))
+    # criterion = nn.BCELoss(weight=torch.tensor(class_weights)).to(get_device())
+    criterion = nn.CrossEntropyLoss(weight=torch.tensor(class_weights)).to(get_device())
+
+    # TODO: add lr scheduler!
+
+    return optimizer_ft, criterion
+
+
 def get_pretrained_model(dataset):
     device = get_device()
 
@@ -179,7 +310,8 @@ def get_pretrained_model(dataset):
 
     labels = dataset.img_labels_not_one_hot
 
-    class_weights = compute_class_weight('balanced', classes=np.unique(np.ravel(labels, order='C')), y=np.ravel(labels, order='C'))
+    class_weights = compute_class_weight('balanced', classes=np.unique(np.ravel(labels, order='C')),
+                                         y=np.ravel(labels, order='C'))
     loss_fn = nn.BCELoss(weight=torch.tensor(class_weights)).to(device)
 
     optimizer_ft = optim.Adam(model.parameters(), lr=hparams['learning_rate'])  # TODO: veure que s'ha de fer amb això
@@ -190,19 +322,19 @@ def get_pretrained_model(dataset):
     return model, loss_fn, optimizer_ft, exp_lr_scheduler
 
 
-def train(dataset):
-    # set_seed(hparams['seed'])
-
-    data_loaders = get_dataloaders(dataset)
-
-    # mean, std = compute_data_metrics(data_loaders)  #  TODO: normalitzar!
-
-    model_ft, loss_fn, optimizer_ft, exp_lr_scheduler = get_pretrained_model(dataset['train'])
-
-    model, train_loss, train_acc, val_loss, val_acc = train_model(model_ft, dataset, data_loaders, loss_fn,
-                                                                  optimizer_ft, get_device(), hparams['num_epochs'])
-
-    plot_losses(train_loss, train_acc, val_loss, val_acc)
+# def train(dataset):
+#     # set_seed(hparams['seed'])
+#
+#     data_loaders = get_dataloaders(dataset)
+#
+#     # mean, std = compute_data_metrics(data_loaders)  #  TODO: normalitzar!
+#
+#     model_ft, loss_fn, optimizer_ft, exp_lr_scheduler = get_pretrained_model(dataset['train'])
+#
+#     model, train_loss, train_acc, val_loss, val_acc = train_model(model_ft, dataset, data_loaders, loss_fn,
+#                                                                   optimizer_ft, get_device(), hparams['num_epochs'])
+#
+#     plot_losses(train_loss, train_acc, val_loss, val_acc)
 
 
 def create_dataset(X, y):
@@ -237,7 +369,16 @@ def main():
         plot_sample_data(dataset['train'])
 
     if rparams['do_train']:
-        train(dataset)
+        data_loaders = get_dataloaders(dataset)
+        model_ft, input_size = initialize_model(rparams['model_name'])
+        print(model_ft)
+        optimizer_ft, criterion = get_optimizer_and_loss(model_ft, dataset['train'])
+
+        model, train_loss, train_acc, val_loss, val_acc = train_model(model_ft, data_loaders, criterion,
+                                                                      optimizer_ft, get_device(), hparams['num_epochs'])
+
+    if rparams['do_train'] and rparams['plot_curves']:
+        plot_losses(train_loss, train_acc, val_loss, val_acc)
 
 
 if __name__ == '__main__':

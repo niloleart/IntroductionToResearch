@@ -29,9 +29,9 @@ def get_eye(index):
 
 
 def get_class(label):
-    if label[0] == 0:
+    if label == 0:
         return 'Healthy'
-    elif label[0] == 1:
+    elif label == 1:
         return 'Ill'
 
 

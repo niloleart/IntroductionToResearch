@@ -8,7 +8,8 @@ from operator import itemgetter
 IMAGE_DATABASE_LOCAL_PATH = "/Users/niloleart/PycharmProjects/mini_dataset"
 IMAGE_DATABASE_REMOTE_PATH = "/home/niloleart/fbm_mntdir/database/UPC - IMAGENES MARATO - ANONIMIZADAS"
 
-ANNOTATIONS_CSV_LOCAL_FILE = "/Users/niloleart/PycharmProjects/mini_labels.csv"  # TODO: uncomment
+# ANNOTATIONS_CSV_LOCAL_FILE = "/Users/niloleart/PycharmProjects/mini_labels.csv"  # TODO: uncomment
+ANNOTATIONS_CSV_LOCAL_FILE = "/Users/niloleart/PycharmProjects/mini_double_labels.csv"
 # ANNOTATIONS_CSV_LOCAL_FILE = "/Users/niloleart/PycharmProjects/mini_labels_imbalance.csv"
 # ANNOTATIONS_CSV_REMOTE_FILE = "/home/niloleart/full_dataset.csv"
 ANNOTATIONS_CSV_REMOTE_FILE = "/home/niloleart/full_double_labels.csv"
