@@ -6,10 +6,12 @@ from torchvision.transforms import transforms
 import torch
 import numpy as np
 
+
 data_transforms = {
     'train': transforms.Compose([
+        transforms.Resize([644, 484]),
+        transforms.CenterCrop([484, 644 * 0.75]),
         # transforms.RandomResizedCrop([335, 506]),
-        # transforms.CenterCrop([224, 224]), # TODO!
         transforms.RandomRotation(degrees=(-30, 30)),
         transforms.ToTensor()
         # transforms.Normalize([24.3918, 56.5434, 53.6119], [33.7875, 35.7010, 57.2551])
@@ -90,12 +92,30 @@ def get_data_formatted(X_train, X_test, y_train, y_test):
     return X_train_out, X_test_out, Y_train_out, Y_test_out
 
 
+def get_transforms(image_type):
+    if image_type == 'color':
+        # TODO: s'ha de normalitzar?!!!
+
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.ToPILImage(),
+            transforms.PILToTensor()
+        ])
+    else:
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            # transforms.Resize([335, 506]),
+            transforms.ToPILImage(),
+            transforms.PILToTensor()
+        ])
+    return transform
+
+
 class MaratoCustomDataset(Dataset):
 
-    def __init__(self, X, y, transform=None, target_transform=None):
-
-        # self.img_eye = X.iloc[:]['macular']
-        self.img_eye = X.iloc[:]['color']
+    def __init__(self, X, y, transform=None, image_type='color', target_transform=None):
+        self.img_type = image_type
+        self.img_eye = X.iloc[:][self.img_type]
 
         self.folder = X.iloc[:]['folder']
         self.img_labels_not_one_hot = y
@@ -104,23 +124,16 @@ class MaratoCustomDataset(Dataset):
                 self.img_labels_not_one_hot.values
             ).to(torch.int64), num_classes=2
         )
-
-        # TODO: s'ha de normalitzar?
-        self.transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Resize([335, 506]),
-            transforms.ToPILImage(),
-            transforms.PILToTensor()
-        ])
+        self.transform = get_transforms(self.img_type)
         self.target_transform = target_transform
 
     def __len__(self):
         return len(self.img_labels)
 
     def __getitem__(self, idx):
+
         img = cv2.imread(self.img_eye.iloc[idx], 1)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
 
         label = self.img_labels[idx]
         label_not_one_hot = self.img_labels_not_one_hot.iloc[idx]

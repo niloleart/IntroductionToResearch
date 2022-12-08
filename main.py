@@ -46,7 +46,7 @@ CSV_REMOTE_PATH = '/home/niloleart/images_paths_and_labels.csv'
 hparams = {
     'seed': 123,
     'batch_size': 8,
-    'num_epochs': 50,
+    'num_epochs': 40,
     'num_classes': 2,
     'learning_rate': 0.001,
     'momentum': 0.9,
@@ -56,10 +56,10 @@ hparams = {
 }
 
 rparams = {
-    'create_csv': False,
+    'create_csv': True,
     'plot_data_sample': True,
-    'local_mode': True,
-    'do_train': True,
+    'local_mode': False,
+    'do_train': False,
     'feature_extracting': False,  # False = finetune whole model, True = only update last layers (classifier)
     'model_name': 'alexnet',  # resnet, alexnet, vgg11_bn, squeezenet, densenet
     'plot_curves': True
@@ -129,11 +129,10 @@ def initialize_model(model_name, feature_extract=False, num_classes=2, use_pretr
         model_ft = models.alexnet(pretrained=use_pretrained)
         set_parameter_requires_grad(model_ft, feature_extract)
         num_ftrs = model_ft.classifier[6].in_features
-        model_ft.classifier[6] = nn.Linear(num_ftrs, num_classes)
-        # model_ft.classifier[6] = nn.Sequential(
-        #     nn.Linear(num_ftrs, num_classes)
-            # nn.Softmax(dim=1)
-        # )
+        model_ft.classifier[6] = nn.Sequential(
+            nn.Linear(num_ftrs, num_classes)
+            # nn.Softmax()
+        )
         input_size = 224
 
     elif model_name == "vgg":
@@ -288,14 +287,16 @@ def get_optimizer_and_loss(model_ft, dataset, feature_extract=rparams['feature_e
             if param.requires_grad == True:
                 print("\t", name)
 
-    optimizer_ft = optim.SGD(params_to_update, hparams['learning_rate'], momentum=hparams['momentum'])
+    # optimizer_ft = optim.SGD(params_to_update, hparams['learning_rate'], momentum=hparams['momentum'])
+    optimizer_ft = optim.Adam(params_to_update, hparams['learning_rate'])  # TODO fer servir adam al principi i després SGD per convergir amb un scheduler, mirar com polles, pq ara per SGD no entrena reees!
 
     labels = dataset.img_labels_not_one_hot
 
     class_weights = compute_class_weight('balanced', classes=np.unique(np.ravel(labels, order='C')),
                                          y=np.ravel(labels, order='C'))
     # criterion = nn.BCELoss(weight=torch.tensor(class_weights)).to(get_device())
-    criterion = nn.CrossEntropyLoss(weight=torch.tensor(class_weights)).to(get_device())
+    criterion = nn.BCEWithLogitsLoss(weight=torch.tensor(class_weights)).to(get_device()) #  TODO: mirar bé si val la pena
+    # criterion = nn.CrossEntropyLoss(weight=torch.tensor(class_weights)).to(get_device())
 
     # TODO: add lr scheduler!
 
@@ -338,7 +339,7 @@ def get_pretrained_model(dataset):
 
 
 def create_dataset(X, y):
-    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0, train_size=.75)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0, train_size=.75, shuffle=False)
 
     X_train, X_test, Y_train, Y_test = get_data_formatted(X_train, X_test, y_train, y_test)
 

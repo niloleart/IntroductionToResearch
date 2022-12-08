@@ -138,10 +138,10 @@ class CreateCSV:
 
         database_path = set_images_database_path(mode)
 
-        for dirIdx, folder in enumerate(sorted(os.listdir(database_path))):
+        for idx, folder in enumerate(sorted(os.listdir(database_path))):
             for _, _, files in os.walk(os.path.join(database_path, folder)):
                 root_path = os.path.join(database_path, folder)
-                if dirIdx - 1 < len(in_labels):
+                if idx < len(in_labels):
                     macular_left_eye, macular_right_eye = get_images_paths(files, root_path, images_type['macular'])
                     macular_left_eyes_paths.append(macular_left_eye)
                     macular_right_eyes_paths.append(macular_right_eye)
@@ -185,12 +185,11 @@ class CreateCSV:
                             'angiography_6x6_superficial'])
                     angiography_6x6_superficial_left_paths.append(angiography_6x6_superficial_left_eye)
                     angiography_6x6_superficial_right_paths.append(angiography_6x6_superficial_right_eye)
-
-                    label_list_right.append(label_to_int(in_labels.values[dirIdx - 1][3]))
-                    label_list_left.append(label_to_int(in_labels.values[dirIdx - 1][4]))
+                    label_list_right.append(label_to_int(in_labels.values[idx][3]))
+                    label_list_left.append(label_to_int(in_labels.values[idx][4]))
                     dir_list.append(get_folder_name(os.path.join(database_path, folder)))
 
-            write_csv(label_list_left, label_list_right, macular_left_eyes_paths, macular_right_eyes_paths, color_left_eyes_paths,
-                      color_right_eyes_paths, dir_list, mode)
+        write_csv(label_list_left, label_list_right, macular_left_eyes_paths, macular_right_eyes_paths, color_left_eyes_paths,
+                    color_right_eyes_paths, dir_list, mode)
 
         return get_path_to_write_csv(mode)
