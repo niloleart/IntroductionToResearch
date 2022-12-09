@@ -1,27 +1,20 @@
 import os
 
 from torch import optim, nn
-from torch.optim import lr_scheduler
-from torchvision.models import VGG16_Weights
-from torchvision.transforms import ToTensor
-
+from torchvision.transforms import transforms
 from data.create_csv import CreateCSV
-from data.load_data import MaratoCustomDataset, compute_data_metrics, get_data, data_transforms, get_data_formatted
-from data.plot_data import plot_sample_data, plot_losses
+from data.load_data import MaratoCustomDataset, get_data, get_data_concat
 from torch.utils.data.sampler import SubsetRandomSampler
 from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
 import torch
 import torchvision.models as models
-import pandas as pd
 from sklearn.model_selection import train_test_split
 
+from data.plot_data import PlotUtils, plot_losses
 from train.train import train_model
 
 # This is a sample Python script.
-
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
 
 # per activar entorn
 # source .virtualenvs/pythonProject/bin/activate
@@ -75,6 +68,7 @@ def set_seed(seed):
 
 def get_dataloaders(dataset):
     # Create data indices for training and validation splits:
+    print('Creating dataloaders...')
     dataloaders = {
         'train':
             torch.utils.data.DataLoader(dataset['train'],
@@ -87,6 +81,27 @@ def get_dataloaders(dataset):
     }
 
     return dataloaders
+
+
+def batch_mean_and_sd(dataloader):
+    total_sum = torch.tensor([0.0, 0.0, 0.0])
+    total_sum_square = torch.tensor([0.0, 0.0, 0.0])
+
+    for images, _, _, _ in dataloader:
+        c, h, w = images.shape
+        total_sum += images.sum(axis=[1, 2])
+        total_sum_square += (images ** 2).sum(axis=[1, 2])
+
+    count = len(dataloader) * h * w
+    total_mean = total_sum / count
+    total_var = (total_sum_square / count) - (total_mean ** 2)
+    total_std = torch.sqrt(total_var)
+    print('mean: ' + str(total_mean))
+    print('std: ' + str(total_std) + '\n')
+
+    transform = transforms.Normalize(mean=total_mean, std=total_std)
+
+    return transform
 
 
 def get_csv_path():
@@ -107,6 +122,7 @@ def set_parameter_requires_grad(model, feature_extracting):
 
 
 def initialize_model(model_name, feature_extract=False, num_classes=2, use_pretrained=True):
+    print('Initializing models')
     model_ft = None
     input_size = 0
 
@@ -195,82 +211,6 @@ def initialize_model(model_name, feature_extract=False, num_classes=2, use_pretr
     return model_ft, input_size
 
 
-def get_VGG_classifier():
-    return nn.Sequential(
-        nn.Linear(158720, 2),
-        # nn.ReLU(),
-        # nn.Dropout(p=0.5),
-        # nn.Linear(512, 256),
-        # nn.ReLU(),
-        # nn.Dropout(p=0.5),
-        # nn.Linear(256, 256),
-        # nn.ReLU(),
-        # nn.Dropout(p=0.5),
-        # nn.Linear(256, 2),  # TODO: és un 1 amb CE? O un 2? Un 1 per BCEWithLogits, un 2 per CELoss
-        # nn.Sigmoid()  # No fa falta amb BCE, per dues classes
-        nn.Softmax(dim=1)  # per multiclass (https://discuss.pytorch.org/t/vgg-output-layer-no-softmax/9273/6)
-    )
-
-
-def get_VGG16(device):
-    pretrained_model = models.vgg16(weights=VGG16_Weights.DEFAULT)
-    feature_extractor = pretrained_model.features
-
-    feature_extractor.to(device)
-
-    if rparams['feature_extracting']:
-        for layer in feature_extractor[:24]:  # Freeze layers 0 to 23
-            for param in layer.parameters():
-                param.requires_grad = False
-
-    for layer in feature_extractor[24:]:  # Train layers 24 to 30
-        for param in layer.parameters():
-            param.requires_grad = True
-
-    feature_classifier = get_VGG_classifier()
-
-    feature_classifier.to(device)
-
-    model = nn.Sequential(
-        feature_extractor,
-        nn.Flatten(),
-        feature_classifier
-    )
-    model.to(device)
-    return model
-
-
-def get_ResNet50(device):
-    pretrained_model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
-    num_features = pretrained_model.fc.in_features
-
-    # for param in pretrained_model.parameters():
-    #     param.requires_grad = False
-
-    if rparams['feature_extracting']:
-        for module, param in zip(pretrained_model.modules(), pretrained_model.parameters()):
-            if isinstance(module, nn.BatchNorm2d):
-                param.requires_grad = False
-
-    pretrained_model.fc = nn.Sequential(
-        nn.Linear(num_features, 2),
-        # nn.BatchNorm1d(512),
-        # nn.ReLU(),
-        # nn.Dropout(p=0.5),
-        # nn.Linear(512, 256),
-        # nn.BatchNorm1d(256),
-        # nn.ReLU(),
-        # nn.Dropout(p=0.5),
-        # nn.Linear(256, 2),  # TODO: és un 1 amb CE? O un 2? Un 1 per BCEWithLogits, un 2 per CELoss
-        # nn.Sigmoid()  # No fa falta amb BCE, per dues classes
-        nn.Softmax()
-        # per multiclass (https://discuss.pytorch.org/t/vgg-output-layer-no-softmax/9273/6) TODO: mirar si fer servir la softmax
-    )
-    pretrained_model.to(device)
-
-    return pretrained_model
-
-
 def get_optimizer_and_loss(model_ft, dataset, feature_extract=rparams['feature_extracting']):
     model_ft = model_ft.to(get_device())
 
@@ -288,14 +228,16 @@ def get_optimizer_and_loss(model_ft, dataset, feature_extract=rparams['feature_e
                 print("\t", name)
 
     # optimizer_ft = optim.SGD(params_to_update, hparams['learning_rate'], momentum=hparams['momentum'])
-    optimizer_ft = optim.Adam(params_to_update, hparams['learning_rate'])  # TODO fer servir adam al principi i després SGD per convergir amb un scheduler, mirar com polles, pq ara per SGD no entrena reees!
+    optimizer_ft = optim.Adam(params_to_update, hparams[
+        'learning_rate'])  # TODO fer servir adam al principi i després SGD per convergir amb un scheduler, mirar com polles, pq ara per SGD no entrena reees!
 
     labels = dataset.img_labels_not_one_hot
 
     class_weights = compute_class_weight('balanced', classes=np.unique(np.ravel(labels, order='C')),
                                          y=np.ravel(labels, order='C'))
     # criterion = nn.BCELoss(weight=torch.tensor(class_weights)).to(get_device())
-    criterion = nn.BCEWithLogitsLoss(weight=torch.tensor(class_weights)).to(get_device()) #  TODO: mirar bé si val la pena
+    criterion = nn.BCEWithLogitsLoss(weight=torch.tensor(class_weights)).to(
+        get_device())  # TODO: mirar bé si val la pena
     # criterion = nn.CrossEntropyLoss(weight=torch.tensor(class_weights)).to(get_device())
 
     # TODO: add lr scheduler!
@@ -303,51 +245,45 @@ def get_optimizer_and_loss(model_ft, dataset, feature_extract=rparams['feature_e
     return optimizer_ft, criterion
 
 
-def get_pretrained_model(dataset):
-    device = get_device()
-
-    # model = get_VGG16(device)
-    model = get_ResNet50(device)
-
-    labels = dataset.img_labels_not_one_hot
-
-    class_weights = compute_class_weight('balanced', classes=np.unique(np.ravel(labels, order='C')),
-                                         y=np.ravel(labels, order='C'))
-    loss_fn = nn.BCELoss(weight=torch.tensor(class_weights)).to(device)
-
-    optimizer_ft = optim.Adam(model.parameters(), lr=hparams['learning_rate'])  # TODO: veure que s'ha de fer amb això
-    # optimizer_ft = optim.Adam(model.fc.parameters(), lr=hparams['learning_rate'])  #  aquí és només si mantenim les capes q fan feat extraction sempre frozen
-
-    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
-
-    return model, loss_fn, optimizer_ft, exp_lr_scheduler
-
-
-# def train(dataset):
-#     # set_seed(hparams['seed'])
-#
-#     data_loaders = get_dataloaders(dataset)
-#
-#     # mean, std = compute_data_metrics(data_loaders)  #  TODO: normalitzar!
-#
-#     model_ft, loss_fn, optimizer_ft, exp_lr_scheduler = get_pretrained_model(dataset['train'])
-#
-#     model, train_loss, train_acc, val_loss, val_acc = train_model(model_ft, dataset, data_loaders, loss_fn,
-#                                                                   optimizer_ft, get_device(), hparams['num_epochs'])
-#
-#     plot_losses(train_loss, train_acc, val_loss, val_acc)
-
-
 def create_dataset(X, y):
+    X_init, y_init = get_data_concat(X, y)
+    dataset = MaratoCustomDataset(X_init, y_init, transforms.ToTensor())
+
+    # Plot init dataset
+    plot = PlotUtils(dataset)
+    plot.plot_samples()
+
+    # Compute mean and std for whole dataset
+    print('Computing mean and std for the dataset')
+    mean_std_transform = batch_mean_and_sd(dataset)
+
+    train_transform = transforms.Compose([
+        transforms.RandomRotation(degrees=(-30, 30)),
+        transforms.ToTensor(),
+        mean_std_transform,
+    ])
+
+    normalize_transform = transforms.Compose([
+        transforms.ToTensor(),
+        mean_std_transform
+    ])
+
+    dataset_normalized = MaratoCustomDataset(X_init, y_init, normalize_transform)
+    plot.plot_samples(dataset_normalized)
+    _ = batch_mean_and_sd(dataset_normalized)
+
+
+    print('Splitting dataset into train/val (75/25)...')
     X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0, train_size=.75, shuffle=True)
 
-    X_train, X_test, Y_train, Y_test = get_data_formatted(X_train, X_test, y_train, y_test)
+    X_train, Y_train = get_data_concat(X_train, y_train)
+    X_test, Y_test = get_data_concat(X_test, y_test)
 
-    train_dataset = MaratoCustomDataset(X_train, Y_train, data_transforms['train'])
-
-    test_dataset = MaratoCustomDataset(X_test, Y_test, data_transforms['train'])
+    train_dataset = MaratoCustomDataset(X_train, Y_train, train_transform)
+    test_dataset = MaratoCustomDataset(X_test, Y_test, normalize_transform)
 
     dataset = {'train': train_dataset, 'val': test_dataset}
+    print('Dataset created. Data is ready!')
     return dataset
 
 
@@ -366,11 +302,12 @@ def main():
 
     dataset = create_dataset(X, y)
 
-    if rparams['plot_data_sample']:
-        plot_sample_data(dataset['train'])
+    # if rparams['plot_data_sample']:
+    #     plot_sample_data(dataset['train'])
 
     if rparams['do_train']:
         data_loaders = get_dataloaders(dataset)
+
         model_ft, input_size = initialize_model(rparams['model_name'])
         print(model_ft)
         optimizer_ft, criterion = get_optimizer_and_loss(model_ft, dataset['train'])
