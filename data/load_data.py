@@ -6,12 +6,10 @@ from torchvision.transforms import transforms
 import torch
 import numpy as np
 
-
+# Applied randomly to the dataset to enhance it
 data_transforms = {
     'train': transforms.Compose([
-        transforms.Resize([644, 484]),
-        transforms.CenterCrop([484, 644 * 0.75]),
-        # transforms.RandomResizedCrop([335, 506]),
+        transforms.RandomCrop([400, 400]), # TODO veure si millora
         transforms.RandomRotation(degrees=(-30, 30)),
         transforms.ToTensor()
         # transforms.Normalize([24.3918, 56.5434, 53.6119], [33.7875, 35.7010, 57.2551])
@@ -72,9 +70,6 @@ def get_data_formatted(X_train, X_test, y_train, y_test):
 
     dict_X_train = {'macular': X_train_macular, 'color': X_train_color, 'folder': X_train_folders}
     X_train_out = pd.DataFrame(dict_X_train)
-
-    y_train_dict = {'labels': y_train_concat}
-    # Y_train_out = pd.DataFrame(y_train_dict)
     Y_train_out = y_train_concat
 
     X_test_macular = pd.concat((X_test.iloc[:, 0], X_test.iloc[:, 1]), axis=0)
@@ -84,27 +79,31 @@ def get_data_formatted(X_train, X_test, y_train, y_test):
 
     dict_X_test = {'macular': X_test_macular, 'color': X_test_color, 'folder': X_test_folders}
     X_test_out = pd.DataFrame(dict_X_test)
-
-    y_test_dict = {'labels': y_test_concat}
-    # Y_test_out = pd.DataFrame(y_test_dict)
     Y_test_out = y_test_concat
 
     return X_train_out, X_test_out, Y_train_out, Y_test_out
 
 
+# Applied to all data
 def get_transforms(image_type):
     if image_type == 'color':
+        width = 644
+        height = 484
+        target_width = int(width * 0.75)
+
         # TODO: s'ha de normalitzar?!!!
 
         transform = transforms.Compose([
             transforms.ToTensor(),
+            transforms.Resize([height, width]),
+            transforms.CenterCrop([height, target_width]),
             transforms.ToPILImage(),
             transforms.PILToTensor()
         ])
     else:
         transform = transforms.Compose([
             transforms.ToTensor(),
-            # transforms.Resize([335, 506]),
+            transforms.Resize([335, 506]),
             transforms.ToPILImage(),
             transforms.PILToTensor()
         ])
@@ -112,7 +111,6 @@ def get_transforms(image_type):
 
 
 class MaratoCustomDataset(Dataset):
-
     def __init__(self, X, y, transform=None, image_type='color', target_transform=None):
         self.img_type = image_type
         self.img_eye = X.iloc[:][self.img_type]
@@ -131,7 +129,6 @@ class MaratoCustomDataset(Dataset):
         return len(self.img_labels)
 
     def __getitem__(self, idx):
-
         img = cv2.imread(self.img_eye.iloc[idx], 1)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 

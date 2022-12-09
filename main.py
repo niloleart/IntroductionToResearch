@@ -56,10 +56,10 @@ hparams = {
 }
 
 rparams = {
-    'create_csv': True,
+    'create_csv': False,
     'plot_data_sample': True,
     'local_mode': False,
-    'do_train': False,
+    'do_train': True,
     'feature_extracting': False,  # False = finetune whole model, True = only update last layers (classifier)
     'model_name': 'alexnet',  # resnet, alexnet, vgg11_bn, squeezenet, densenet
     'plot_curves': True
@@ -339,7 +339,7 @@ def get_pretrained_model(dataset):
 
 
 def create_dataset(X, y):
-    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0, train_size=.75, shuffle=False)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0, train_size=.75, shuffle=True)
 
     X_train, X_test, Y_train, Y_test = get_data_formatted(X_train, X_test, y_train, y_test)
 

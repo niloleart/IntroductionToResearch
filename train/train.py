@@ -50,10 +50,10 @@ def train_model(model, dataloaders, criterion, optimizer, device,
             running_loss = 0.0
             running_corrects = 0
 
-            for inputs, _, labels, _ in dataloaders[phase]:
+            for inputs, labels_raw, labels_one_hot, _ in dataloaders[phase]:
                 inputs = torch.permute(inputs, (0, 3, 1, 2))
                 inputs = inputs.float().to(device)
-                labels = labels.float().to(device)
+                labels_one_hot = labels_one_hot.float().to(device)
 
                 optimizer.zero_grad()
 
@@ -61,7 +61,7 @@ def train_model(model, dataloaders, criterion, optimizer, device,
                 # track history if only in train
                 with torch.set_grad_enabled(phase == 'train'):
                     outputs = model(inputs)
-                    loss = criterion(outputs, labels)
+                    loss = criterion(outputs, labels_one_hot)
                     _, preds = torch.max(outputs, 1)
 
                     if phase == 'train':
@@ -70,17 +70,17 @@ def train_model(model, dataloaders, criterion, optimizer, device,
 
                 # _, preds = torch.max(outputs, 1)
                 running_loss += loss.item() * inputs.size(0)
-                running_corrects += torch.sum(preds == torch.argmax(labels, 1)).item()
+                running_corrects += torch.sum(preds == torch.argmax(labels_one_hot, 1)).item()
 
-                # recall = retrieval_recall(preds, labels)
-                # epoch_specificity = BinarySpecificity(preds, labels)
+                # recall = retrieval_recall(preds, labels_one_hot)
+                # epoch_specificity = BinarySpecificity(preds, labels_one_hot)
 
             epoch_loss = running_loss / len(dataloaders[phase].dataset)
             epoch_acc = running_corrects / len(dataloaders[phase].dataset)
             # epoch_specificity = epoch_specificity / len(datasets[phase])
             # epoch_recall = recall / len(datasets[phase])
 
-            print('{} loss: {:.4f}, acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
+            # print('{} loss: {:.4f}, Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
 
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
@@ -94,6 +94,8 @@ def train_model(model, dataloaders, criterion, optimizer, device,
             else:
                 val_loss.append(epoch_loss)
                 val_acc.append(epoch_acc)
+
+            print('{} loss: {:.4f}, Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
 
         print()
 
