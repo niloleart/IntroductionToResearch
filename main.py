@@ -35,13 +35,12 @@ from train.train import train_model
 
 CSV_LOCAL_PATH = '/Users/niloleart/PycharmProjects/test.csv'
 CSV_REMOTE_PATH = '/home/niloleart/images_paths_and_labels.csv'
-
+dev = None
 hparams = {
-    'seed': 123,
-    'batch_size': 8,
-    'num_epochs': 40,
+    'batch_size': 64,
+    'num_epochs': 1000,
     'num_classes': 2,
-    'learning_rate': 0.001,
+    'learning_rate': 0.0001,
     'momentum': 0.9,
     'validation_split': .2,
     'test_split': .0,
@@ -50,21 +49,19 @@ hparams = {
 
 rparams = {
     'create_csv': False,
-    'plot_data_sample': True,
+    'plot_data_sample': False,
     'local_mode': False,
     'do_train': True,
-    'feature_extracting': False,  # False = finetune whole model, True = only update last layers (classifier)
-    'model_name': 'alexnet',  # resnet, alexnet, vgg11_bn, squeezenet, densenet
+    'image_type': 'octa_3x3_sup',  # color, octa_3x3_sup...
+    'compute_mean_and_std': False,
+    'feature_extracting': True,  # False = finetune whole model, True = only update last layers (classifier)
+    'model_name': 'vgg',
+    # resnet, alexnet, vgg11_bn, squeezenet, densenet # Try ResNet50, InceptionV3, AlexNet, VGG16_bn
     'plot_curves': True
 }
 
 
-# Not used
-def set_seed(seed):
-    np.random.seed(seed)
-    _ = torch.manual_seed(seed)
-    _ = torch.cuda.manual_seed(seed)
-
+# Not use
 
 def get_dataloaders(dataset):
     # Create data indices for training and validation splits:
@@ -99,9 +96,7 @@ def batch_mean_and_sd(dataloader):
     print('mean: ' + str(total_mean))
     print('std: ' + str(total_std) + '\n')
 
-    transform = transforms.Normalize(mean=total_mean, std=total_std)
-
-    return transform
+    return total_mean, total_std
 
 
 def get_csv_path():
@@ -112,6 +107,13 @@ def get_csv_path():
 
 
 def get_device():
+    if torch.cuda.is_available():
+        print("GPU is available!")
+        device = 'cuda:0'
+    else:
+        print("WARNING! GPU NOT AVAILABLE!")
+        device = 'cpu'
+    return device
     return torch.device('cuda:0' if torch.cuda.is_available() else "cpu")
 
 
@@ -127,39 +129,42 @@ def initialize_model(model_name, feature_extract=False, num_classes=2, use_pretr
     input_size = 0
 
     if model_name == "resnet":
-        """Resnet18
+        """Resnet50
         """
 
-        model_ft = models.resnet18(pretrained=use_pretrained)
+        model_ft = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
         set_parameter_requires_grad(model_ft, feature_extract)
         num_ftrs = model_ft.fc.in_features
         model_ft.fc = nn.Sequential(
-            nn.Linear(num_ftrs, num_classes),
-            nn.Softmax(dim=1)
+            nn.Linear(num_ftrs, num_classes - 1),
         )
         input_size = 224
 
     elif model_name == "alexnet":
         """ Alexnet
         """
-        model_ft = models.alexnet(pretrained=use_pretrained)
+        model_ft = models.alexnet(weights=use_pretrained)
         set_parameter_requires_grad(model_ft, feature_extract)
         num_ftrs = model_ft.classifier[6].in_features
         model_ft.classifier[6] = nn.Sequential(
-            nn.Linear(num_ftrs, num_classes)
-            # nn.Softmax()
+            nn.Linear(num_ftrs, num_classes - 1)
         )
         input_size = 224
 
     elif model_name == "vgg":
-        """ VGG11_bn
+        """ VGG16_bn
         """
-        model_ft = models.vgg11_bn(pretrained=use_pretrained)
+        model_ft = models.vgg16_bn(weights=models.VGG16_BN_Weights)
         set_parameter_requires_grad(model_ft, feature_extract)
         num_ftrs = model_ft.classifier[6].in_features
+
+        if rparams['image_type'] != 'color':
+            conv_weight = model_ft.features[0].weight
+            model_ft.features[0].in_channels = 1
+            model_ft.features[0].weight = torch.nn.Parameter(conv_weight.sum(dim=1, keepdim=True))
+
         model_ft.classifier[6] = nn.Sequential(
-            nn.Linear(num_ftrs, num_classes),
-            nn.Softmax(dim=1)
+            nn.Linear(num_ftrs, 1)
         )
         input_size = 224
 
@@ -191,7 +196,7 @@ def initialize_model(model_name, feature_extract=False, num_classes=2, use_pretr
         """ Inception v3
         Be careful, expects (299,299) sized images and has auxiliary output
         """
-        model_ft = models.inception_v3(pretrained=use_pretrained)
+        model_ft = models.inception_v3(weights=use_pretrained)
         set_parameter_requires_grad(model_ft, feature_extract)
         # Handle the auxilary net
         num_ftrs = model_ft.AuxLogits.fc.in_features
@@ -199,8 +204,7 @@ def initialize_model(model_name, feature_extract=False, num_classes=2, use_pretr
         # Handle the primary net
         num_ftrs = model_ft.fc.in_features
         model_ft.fc = nn.Sequential(
-            nn.Linear(num_ftrs, num_classes),
-            nn.Softmax(dim=1)
+            nn.Linear(num_ftrs, num_classes - 1)
         )
         input_size = 299
 
@@ -212,9 +216,8 @@ def initialize_model(model_name, feature_extract=False, num_classes=2, use_pretr
 
 
 def get_optimizer_and_loss(model_ft, dataset, feature_extract=rparams['feature_extracting']):
-    model_ft = model_ft.to(get_device())
-
     params_to_update = model_ft.parameters()
+
     print("Params to learn:")
     if feature_extract:
         params_to_update = []
@@ -227,51 +230,73 @@ def get_optimizer_and_loss(model_ft, dataset, feature_extract=rparams['feature_e
             if param.requires_grad == True:
                 print("\t", name)
 
-    # optimizer_ft = optim.SGD(params_to_update, hparams['learning_rate'], momentum=hparams['momentum'])
+    # optimizer_ft = optim.SGD(params_to_update, hparams['learning_rate'], momentum=hparams['momentum'], nesterov=False)
     optimizer_ft = optim.Adam(params_to_update, hparams[
         'learning_rate'])  # TODO fer servir adam al principi i després SGD per convergir amb un scheduler, mirar com polles, pq ara per SGD no entrena reees!
+    scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=2, gamma=0.1)
 
     labels = dataset.img_labels_not_one_hot
 
     class_weights = compute_class_weight('balanced', classes=np.unique(np.ravel(labels, order='C')),
                                          y=np.ravel(labels, order='C'))
+
+    # num_positives = torch.tensor(sum(labels == 1), dtype=float)
+    # num_negatives = torch.tensor(len(labels) - num_positives, dtype=float)
+    # pos_weight = (num_negatives / num_positives)
+
     # criterion = nn.BCELoss(weight=torch.tensor(class_weights)).to(get_device())
-    criterion = nn.BCEWithLogitsLoss(weight=torch.tensor(class_weights)).to(
-        get_device())  # TODO: mirar bé si val la pena
+    # criterion = nn.BCEWithLogitsLoss(weight=torch.tensor(class_weights)).to(  # TODO: fer servir una sola neurona
+    #     get_device())
+    criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(2.4).clone().detach()).to(dev)
     # criterion = nn.CrossEntropyLoss(weight=torch.tensor(class_weights)).to(get_device())
 
     # TODO: add lr scheduler!
 
-    return optimizer_ft, criterion
+    return optimizer_ft, criterion, scheduler
 
 
 def create_dataset(X, y):
     X_init, y_init = get_data_concat(X, y)
     dataset = MaratoCustomDataset(X_init, y_init, transforms.ToTensor())
 
-    # Plot init dataset
+    # Plot init dataset (whole data)
     plot = PlotUtils(dataset)
     plot.plot_samples()
 
-    # Compute mean and std for whole dataset
-    print('Computing mean and std for the dataset')
-    mean_std_transform = batch_mean_and_sd(dataset)
+    if rparams['compute_mean_and_std']:
+        # Compute mean and std for whole dataset
+        print('Computing mean and std for the dataset')
+        total_mean, total_std = batch_mean_and_sd(dataset)
 
-    train_transform = transforms.Compose([
-        transforms.RandomRotation(degrees=(-30, 30)),
-        transforms.ToTensor(),
-        mean_std_transform,
-    ])
+        if rparams['image_type'] == 'octa_3x3_sup':
+            total_mean = total_mean[0]
+            total_std = total_std[0]
+
+        norm_transforms = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=total_mean, std=total_std)
+
+        ])
+
+        dataset_normalized = MaratoCustomDataset(X_init, y_init, target_transform=norm_transforms)
+
+        plot.plot_samples(dataset_normalized)
+        print('Computing mean and std for the normalized dataset')
+        normalized_mean, normalized_std = batch_mean_and_sd(dataset_normalized)
+
+    else:
+        if rparams['image_type'] == 'color':
+            total_mean = ([0.4292, 0.1894, 0.1048])
+            total_std = ([0.2798, 0.1336, 0.0811])
+
+        elif rparams['image_type'] == 'octa_3x3_sup':
+            total_mean = 0.2622
+            total_std = 0.1776
 
     normalize_transform = transforms.Compose([
         transforms.ToTensor(),
-        mean_std_transform
+        transforms.Normalize(mean=total_mean, std=total_std)
     ])
-
-    dataset_normalized = MaratoCustomDataset(X_init, y_init, normalize_transform)
-    plot.plot_samples(dataset_normalized)
-    _ = batch_mean_and_sd(dataset_normalized)
-
 
     print('Splitting dataset into train/val (75/25)...')
     X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0, train_size=.75, shuffle=True)
@@ -279,7 +304,9 @@ def create_dataset(X, y):
     X_train, Y_train = get_data_concat(X_train, y_train)
     X_test, Y_test = get_data_concat(X_test, y_test)
 
-    train_dataset = MaratoCustomDataset(X_train, Y_train, train_transform)
+    train_dataset = MaratoCustomDataset(X_train, Y_train, normalize_transform)  #TODO data aug goes here
+    plot.plot_samples(train_dataset)
+
     test_dataset = MaratoCustomDataset(X_test, Y_test, normalize_transform)
 
     dataset = {'train': train_dataset, 'val': test_dataset}
@@ -288,6 +315,7 @@ def create_dataset(X, y):
 
 
 def main():
+    dev = get_device()
     # Creates a CSV file with "Row1=full img path", "Row2 = label" (0 = healthy, 1 = ill)
     if rparams['create_csv']:
         c = CreateCSV()
@@ -302,21 +330,20 @@ def main():
 
     dataset = create_dataset(X, y)
 
-    # if rparams['plot_data_sample']:
-    #     plot_sample_data(dataset['train'])
-
     if rparams['do_train']:
         data_loaders = get_dataloaders(dataset)
 
-        model_ft, input_size = initialize_model(rparams['model_name'])
+        model_ft, input_size = initialize_model(rparams['model_name'], rparams['feature_extracting'])
         print(model_ft)
-        optimizer_ft, criterion = get_optimizer_and_loss(model_ft, dataset['train'])
+        optimizer_ft, criterion, scheduler = get_optimizer_and_loss(model_ft, dataset['train'])
 
-        model, train_loss, train_acc, val_loss, val_acc = train_model(model_ft, data_loaders, criterion,
-                                                                      optimizer_ft, get_device(), hparams['num_epochs'])
+        model, train_loss, train_acc, train_auc, val_loss, val_acc, val_auc = train_model(model_ft, data_loaders,
+                                                                                          criterion,
+                                                                                          optimizer_ft, scheduler, dev,
+                                                                                          hparams['num_epochs'])
 
     if rparams['do_train'] and rparams['plot_curves']:
-        plot_losses(train_loss, train_acc, val_loss, val_acc)
+        plot_losses(train_loss, train_acc, train_auc, val_loss, val_acc, val_auc)
 
 
 if __name__ == '__main__':

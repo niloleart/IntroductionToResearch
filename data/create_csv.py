@@ -52,15 +52,18 @@ def get_writer(local_mode):
     return f, writer
 
 
-def write_csv(labels_left, labels_right, left_eye_paths, right_eyes_paths, color_left_eyes_paths, color_right_eyes_paths, folder,
+def write_csv(labels_left, labels_right, left_eye_paths, right_eyes_paths, color_left_eyes_paths, color_right_eyes_paths, octa_3x3_sup_left,
+              octa_3x3_sup_right, folder,
               local_mode):
-    header = ['left_macular', 'right_macular', 'left_color', 'right_color', 'folder', 'label_left', 'label_right']
+    header = ['left_macular', 'right_macular', 'left_color', 'right_color', 'left_octa_3x3_sup','right_octa_3x3_sup',
+              'folder', 'label_left', 'label_right']
     try:
         f, writer = get_writer(local_mode)
         writer.writerow(header)
         for index, label in enumerate(labels_right):
             writer.writerow([left_eye_paths[index], right_eyes_paths[index], color_left_eyes_paths[index],
-                             color_right_eyes_paths[index], folder[index], labels_left[index], labels_right[index]])
+                             color_right_eyes_paths[index], octa_3x3_sup_left[index],
+                             octa_3x3_sup_right[index], folder[index], labels_left[index], labels_right[index]])
         f.close()
         print("Successfully writen", len(labels_right), "labels and paths into", get_path_to_write_csv(local_mode))
     except Exception as e:
@@ -190,6 +193,7 @@ class CreateCSV:
                     dir_list.append(get_folder_name(os.path.join(database_path, folder)))
 
         write_csv(label_list_left, label_list_right, macular_left_eyes_paths, macular_right_eyes_paths, color_left_eyes_paths,
-                    color_right_eyes_paths, dir_list, mode)
+                    color_right_eyes_paths, angiography_3x3_superficial_left_paths, angiography_3x3_superficial_right_paths,
+                  dir_list, mode)
 
         return get_path_to_write_csv(mode)

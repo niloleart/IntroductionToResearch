@@ -6,16 +6,18 @@ import torch
 
 
 def get_data(csv_path):
-    columns = ['left_macular', 'right_macular', 'left_color', 'right_color', 'folder', 'label_left', 'label_right']
+    columns = ['left_macular', 'right_macular', 'left_color', 'right_color', 'left_octa_3x3_sup', 'right_octa_3x3_sup',
+               'folder', 'label_left', 'label_right']
 
-    df = pd.read_csv(csv_path, sep=",", index_col=False, squeeze=True)
+    df = pd.read_csv(csv_path, sep=",", index_col=False).squeeze(1)
 
     # TODO: mirar què es pot fer en comptes de petar-nos tota la fila a lo loco
     df = df.dropna(axis=0)
 
     df = df.loc[:, columns]  # https://builtin.com/data-science/train-test-split
     df.head(len(df))
-    features = ['left_macular', 'right_macular', 'left_color', 'right_color', 'folder']
+    features = ['left_macular', 'right_macular', 'left_color', 'right_color', 'left_octa_3x3_sup', 'right_octa_3x3_sup',
+                'folder']
     labels = ['label_left', 'label_right']
 
     X = df.loc[:, features]
@@ -27,10 +29,11 @@ def get_data(csv_path):
 def get_data_concat(X, y):
     X_macular = pd.concat((X.iloc[:, 0], X.iloc[:, 1]), axis=0)
     X_color = pd.concat((X.iloc[:, 2], X.iloc[:, 3]), axis=0)
-    X_folders = pd.concat((X.iloc[:, 4], X.iloc[:, 4]), axis=0)
+    X_octa_3x3_sup = pd.concat((X.iloc[:, 4], X.iloc[:, 5]), axis=0)
+    X_folders = pd.concat((X.iloc[:, 6], X.iloc[:, 6]), axis=0)
     y_train_concat = pd.concat((y.iloc[:, 0], y.iloc[:, 1]), axis=0)
 
-    dict_X = {'macular': X_macular, 'color': X_color, 'folder': X_folders}
+    dict_X = {'macular': X_macular, 'color': X_color, 'octa_3x3_sup': X_octa_3x3_sup, 'folder': X_folders}
     X_out = pd.DataFrame(dict_X)
     Y_out = y_train_concat
     return X_out, Y_out
@@ -48,8 +51,13 @@ def get_transforms(image_type):
             transforms.Resize([height, width]),
             transforms.CenterCrop([height, target_width]),
         ])
+    elif image_type == 'octa_3x3_sup':
+        transform = transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.Resize([224, 224])
+        ])
     else:
-        transform = transforms.Compose([  # TODO for other image types!
+        transform = transforms.Compose([
             # transforms.ToTensor(),
             # transforms.Resize([335, 506]),
             # transforms.ToPILImage(),
@@ -59,7 +67,7 @@ def get_transforms(image_type):
 
 
 class MaratoCustomDataset(Dataset):
-    def __init__(self, X, y, target_transform=None, image_type='color'):
+    def __init__(self, X, y, target_transform=None, image_type='octa_3x3_sup'):
         self.img_type = image_type
         self.img_eye = X.iloc[:][self.img_type]
 
@@ -80,8 +88,11 @@ class MaratoCustomDataset(Dataset):
         return len(self.img_labels)
 
     def __getitem__(self, idx):
-        img = cv2.imread(self.img_eye.iloc[idx], 1)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        if self.img_type == 'octa_3x3_sup':
+            img = cv2.imread(self.img_eye.iloc[idx], cv2.IMREAD_GRAYSCALE)
+        else:
+            img = cv2.imread(self.img_eye.iloc[idx], 1)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         label = self.img_labels[idx]
         label_not_one_hot = self.img_labels_not_one_hot.iloc[idx]
