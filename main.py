@@ -48,18 +48,17 @@ hparams = {
 }
 
 rparams = {
-    'create_csv': False,
+    'create_csv': True,
     'plot_data_sample': False,
     'local_mode': False,
     'do_train': True,
-    'image_type': 'octa_3x3_sup',  # color, octa_3x3_sup...
+    'image_type': 'octa_6x6_deep',  # color, macular, octa_3x3_sup, octa_3x3_deep, octa_6x6_sup,
     'compute_mean_and_std': False,
     'feature_extracting': True,  # False = finetune whole model, True = only update last layers (classifier)
-    'model_name': 'vgg',
+    'model_name': 'resnet',
     # resnet, alexnet, vgg11_bn, squeezenet, densenet # Try ResNet50, InceptionV3, AlexNet, VGG16_bn
-    'plot_curves': True
+    'plot_curves': True,
 }
-
 
 # Not use
 
@@ -134,6 +133,12 @@ def initialize_model(model_name, feature_extract=False, num_classes=2, use_pretr
 
         model_ft = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
         set_parameter_requires_grad(model_ft, feature_extract)
+
+        if rparams['image_type'] != 'color' and rparams['image_type'] != 'macular':
+            conv_weight = model_ft.conv1.weight
+            model_ft.conv1.in_channels = 1
+            model_ft.conv1.weight = torch.nn.Parameter(conv_weight.sum(dim=1, keepdim=True))
+
         num_ftrs = model_ft.fc.in_features
         model_ft.fc = nn.Sequential(
             nn.Linear(num_ftrs, num_classes - 1),
@@ -145,6 +150,12 @@ def initialize_model(model_name, feature_extract=False, num_classes=2, use_pretr
         """
         model_ft = models.alexnet(weights=use_pretrained)
         set_parameter_requires_grad(model_ft, feature_extract)
+
+        if rparams['image_type'] != 'color' and rparams['image_type'] != 'macular':
+            conv_weight = model_ft.features[0].weight
+            model_ft.features[0].in_channels = 1
+            model_ft.features[0].weight = torch.nn.Parameter(conv_weight.sum(dim=1, keepdim=True))
+
         num_ftrs = model_ft.classifier[6].in_features
         model_ft.classifier[6] = nn.Sequential(
             nn.Linear(num_ftrs, num_classes - 1)
@@ -156,13 +167,13 @@ def initialize_model(model_name, feature_extract=False, num_classes=2, use_pretr
         """
         model_ft = models.vgg16_bn(weights=models.VGG16_BN_Weights)
         set_parameter_requires_grad(model_ft, feature_extract)
-        num_ftrs = model_ft.classifier[6].in_features
 
-        if rparams['image_type'] != 'color':
+        if rparams['image_type'] != 'color' and rparams['image_type'] != 'macular':
             conv_weight = model_ft.features[0].weight
             model_ft.features[0].in_channels = 1
             model_ft.features[0].weight = torch.nn.Parameter(conv_weight.sum(dim=1, keepdim=True))
 
+        num_ftrs = model_ft.classifier[6].in_features
         model_ft.classifier[6] = nn.Sequential(
             nn.Linear(num_ftrs, 1)
         )
@@ -257,7 +268,7 @@ def get_optimizer_and_loss(model_ft, dataset, feature_extract=rparams['feature_e
 
 def create_dataset(X, y):
     X_init, y_init = get_data_concat(X, y)
-    dataset = MaratoCustomDataset(X_init, y_init, transforms.ToTensor())
+    dataset = MaratoCustomDataset(X_init, y_init, transforms.ToTensor(), rparams['image_type'])
 
     # Plot init dataset (whole data)
     plot = PlotUtils(dataset)
@@ -268,7 +279,8 @@ def create_dataset(X, y):
         print('Computing mean and std for the dataset')
         total_mean, total_std = batch_mean_and_sd(dataset)
 
-        if rparams['image_type'] == 'octa_3x3_sup':
+        if rparams['image_type'] == 'octa_3x3_sup' or rparams['image_type'] == 'octa_3x3_deep' \
+            or rparams['image_type'] == 'octa_6x6_sup' or rparams['image_type'] == 'octa_6x6_deep':
             total_mean = total_mean[0]
             total_std = total_std[0]
 
@@ -293,6 +305,22 @@ def create_dataset(X, y):
             total_mean = 0.2622
             total_std = 0.1776
 
+        elif rparams['image_type'] == 'octa_3x3_deep':
+            total_mean = 0.1868
+            total_std = 0.1087
+
+        elif rparams['image_type'] == 'octa_6x6_sup':
+            total_mean = 0.3539
+            total_std = 0.1409
+
+        elif rparams['image_type'] == 'octa_6x6_deep':
+            total_mean = 0.2465
+            total_std = 0.0847
+
+        elif rparams['image_type'] == 'macular':
+            total_mean = ([0.0895, 0.2247, 0.2095])
+            total_std = ([0.1765, 0.2882, 0.1578])
+
     normalize_transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(mean=total_mean, std=total_std)
@@ -304,10 +332,10 @@ def create_dataset(X, y):
     X_train, Y_train = get_data_concat(X_train, y_train)
     X_test, Y_test = get_data_concat(X_test, y_test)
 
-    train_dataset = MaratoCustomDataset(X_train, Y_train, normalize_transform)  #TODO data aug goes here
+    train_dataset = MaratoCustomDataset(X_train, Y_train, normalize_transform, rparams['image_type'])  #TODO data aug goes here
     plot.plot_samples(train_dataset)
 
-    test_dataset = MaratoCustomDataset(X_test, Y_test, normalize_transform)
+    test_dataset = MaratoCustomDataset(X_test, Y_test, normalize_transform, rparams['image_type'])
 
     dataset = {'train': train_dataset, 'val': test_dataset}
     print('Dataset created. Data is ready!')
@@ -337,13 +365,13 @@ def main():
         print(model_ft)
         optimizer_ft, criterion, scheduler = get_optimizer_and_loss(model_ft, dataset['train'])
 
-        model, train_loss, train_acc, train_auc, val_loss, val_acc, val_auc = train_model(model_ft, data_loaders,
+        model, train_loss, train_f1, train_auc, val_loss, val_f1, val_auc = train_model(model_ft, data_loaders,
                                                                                           criterion,
                                                                                           optimizer_ft, scheduler, dev,
                                                                                           hparams['num_epochs'])
 
     if rparams['do_train'] and rparams['plot_curves']:
-        plot_losses(train_loss, train_acc, train_auc, val_loss, val_acc, val_auc)
+        plot_losses(train_loss, train_f1, train_auc, val_loss, val_f1, val_auc)
 
 
 if __name__ == '__main__':

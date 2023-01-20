@@ -44,17 +44,17 @@ class PlotUtils():
             return 'Ill'
 
 
-def plot_losses(train_loss, train_acc, train_auc, val_loss, val_acc, val_auc):
-    epochs = range(len(train_acc))
-    plt.plot(epochs, train_acc, 'b', label='Training acc')
-    plt.plot(epochs, val_acc, 'r', label='Validation acc')
-    plt.title('Training and validation accuracy')
+def plot_losses(train_loss, train_f1, train_auc, val_loss, val_f1, val_auc):
+    epochs = range(len(train_f1))
+    plt.plot(epochs, train_f1, 'b', label='Training F1-score')
+    plt.plot(epochs, val_f1, 'r', label='Validation F1-score')
+    plt.title('Training and validation F1-scores')
     plt.legend()
     plt.figure()
 
-    plt.plot(epochs, train_loss, 'b', label='Training loss')
-    plt.plot(epochs, val_loss, 'r', label='Validation loss')
-    plt.title('Training and validation loss')
+    plt.plot(epochs, train_loss, 'b', label='Training Loss')
+    plt.plot(epochs, val_loss, 'r', label='Validation Loss')
+    plt.title('Training and validation losses')
     plt.legend()
     plt.figure()
 
