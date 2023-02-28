@@ -1,7 +1,7 @@
-import os
-
 from torch import optim, nn
 from torchvision.transforms import transforms
+
+from model import inception
 from data.create_csv import CreateCSV
 from data.load_data import MaratoCustomDataset, get_data, get_data_concat
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -37,14 +37,13 @@ CSV_LOCAL_PATH = '/Users/niloleart/PycharmProjects/test.csv'
 CSV_REMOTE_PATH = '/home/niloleart/images_paths_and_labels.csv'
 dev = None
 hparams = {
-    'batch_size': 64,
-    'num_epochs': 1000,
+    'batch_size': 64, #TODO change to 64
+    'num_epochs': 10,
     'num_classes': 2,
     'learning_rate': 0.0001,
     'momentum': 0.9,
     'validation_split': .2,
-    'test_split': .0,
-    'shuffle_dataset': True
+    'test_split': .0
 }
 
 rparams = {
@@ -52,13 +51,16 @@ rparams = {
     'plot_data_sample': False,
     'local_mode': False,
     'do_train': True,
-    'image_type': 'octa_6x6_deep',  # color, macular, octa_3x3_sup, octa_3x3_deep, octa_6x6_sup,
+    'do_test': True,
+    'image_type': 'octa_3x3_sup',  # color, macular, octa_3x3_sup, octa_3x3_deep, octa_6x6_sup,
     'compute_mean_and_std': False,
-    'feature_extracting': True,  # False = finetune whole model, True = only update last layers (classifier)
-    'model_name': 'resnet',
-    # resnet, alexnet, vgg11_bn, squeezenet, densenet # Try ResNet50, InceptionV3, AlexNet, VGG16_bn
+    'feature_extracting': False,  # False = finetune whole model, True = only update last layers (classifier)
+    'model_name': 'inception',
+    # use: resnet, inception, alexnet, vgg, squeezenet, densenet -> for: ResNet50, InceptionV3, AlexNet, VGG16_bn
     'plot_curves': True,
+    'concatenate': 'depth',  # 'depth' for 4 channel images, '2d' for mosaic
 }
+
 
 # Not use
 
@@ -108,12 +110,13 @@ def get_csv_path():
 def get_device():
     if torch.cuda.is_available():
         print("GPU is available!")
-        device = 'cuda:0'
+        device = 'cuda:1'
+        # device = 'cpu'
     else:
         print("WARNING! GPU NOT AVAILABLE!")
         device = 'cpu'
     return device
-    return torch.device('cuda:0' if torch.cuda.is_available() else "cpu")
+    # return torch.device('cuda:1' if torch.cuda.is_available() else "cpu")
 
 
 def set_parameter_requires_grad(model, feature_extracting):
@@ -175,7 +178,7 @@ def initialize_model(model_name, feature_extract=False, num_classes=2, use_pretr
 
         num_ftrs = model_ft.classifier[6].in_features
         model_ft.classifier[6] = nn.Sequential(
-            nn.Linear(num_ftrs, 1)
+            nn.Linear(num_ftrs, num_classes - 1)
         )
         input_size = 224
 
@@ -186,7 +189,7 @@ def initialize_model(model_name, feature_extract=False, num_classes=2, use_pretr
         set_parameter_requires_grad(model_ft, feature_extract)
         model_ft.classifier[1] = nn.Sequential(
             nn.Conv2d(512, num_classes, kernel_size=(1, 1), stride=(1, 1)),
-            nn.Softmax(dim=1)
+            nn.Softmax()
         )
         model_ft.num_classes = num_classes
         input_size = 224
@@ -207,15 +210,28 @@ def initialize_model(model_name, feature_extract=False, num_classes=2, use_pretr
         """ Inception v3
         Be careful, expects (299,299) sized images and has auxiliary output
         """
-        model_ft = models.inception_v3(weights=use_pretrained)
+        model_ft = inception.nilception(pretrained=use_pretrained)
+
         set_parameter_requires_grad(model_ft, feature_extract)
+
+        if rparams['image_type'] != 'color' and rparams['image_type'] != 'macular':
+            model_ft.transform_input = False
+
+            conv_weight = model_ft.Conv2d_1a_3x3.conv.weight
+            model_ft.Conv2d_1a_3x3.conv.in_channels = 1
+            model_ft.Conv2d_1a_3x3.conv.weight = torch.nn.Parameter(conv_weight.sum(dim=1, keepdim=True))
+
+        model_ft.maxpool2 = torch.nn.AvgPool2d(kernel_size=3, stride=2, padding=0, ceil_mode=False)
+        set_parameter_requires_grad(model_ft, feature_extract)
+
         # Handle the auxilary net
         num_ftrs = model_ft.AuxLogits.fc.in_features
         model_ft.AuxLogits.fc = nn.Linear(num_ftrs, num_classes)
         # Handle the primary net
         num_ftrs = model_ft.fc.in_features
         model_ft.fc = nn.Sequential(
-            nn.Linear(num_ftrs, num_classes - 1)
+            nn.Linear(num_ftrs, num_classes),
+            # nn.Softmax(dim=-1) #AMB BCE no fa falta per training
         )
         input_size = 299
 
@@ -258,6 +274,7 @@ def get_optimizer_and_loss(model_ft, dataset, feature_extract=rparams['feature_e
     # criterion = nn.BCELoss(weight=torch.tensor(class_weights)).to(get_device())
     # criterion = nn.BCEWithLogitsLoss(weight=torch.tensor(class_weights)).to(  # TODO: fer servir una sola neurona
     #     get_device())
+    # TODO calcular el valor del tensor per cada tipus d'experiment, no es el mateix en RDR q en DM!
     criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(2.4).clone().detach()).to(dev)
     # criterion = nn.CrossEntropyLoss(weight=torch.tensor(class_weights)).to(get_device())
 
@@ -266,9 +283,9 @@ def get_optimizer_and_loss(model_ft, dataset, feature_extract=rparams['feature_e
     return optimizer_ft, criterion, scheduler
 
 
-def create_dataset(X, y):
+def create_dataset(X, y, input_size):
     X_init, y_init = get_data_concat(X, y)
-    dataset = MaratoCustomDataset(X_init, y_init, transforms.ToTensor(), rparams['image_type'])
+    dataset = MaratoCustomDataset(X_init, y_init, transforms.ToTensor(), rparams['image_type'], input_size)
 
     # Plot init dataset (whole data)
     plot = PlotUtils(dataset)
@@ -280,7 +297,7 @@ def create_dataset(X, y):
         total_mean, total_std = batch_mean_and_sd(dataset)
 
         if rparams['image_type'] == 'octa_3x3_sup' or rparams['image_type'] == 'octa_3x3_deep' \
-            or rparams['image_type'] == 'octa_6x6_sup' or rparams['image_type'] == 'octa_6x6_deep':
+                or rparams['image_type'] == 'octa_6x6_sup' or rparams['image_type'] == 'octa_6x6_deep':
             total_mean = total_mean[0]
             total_std = total_std[0]
 
@@ -297,47 +314,53 @@ def create_dataset(X, y):
         normalized_mean, normalized_std = batch_mean_and_sd(dataset_normalized)
 
     else:
-        if rparams['image_type'] == 'color':
-            total_mean = ([0.4292, 0.1894, 0.1048])
-            total_std = ([0.2798, 0.1336, 0.0811])
+        if rparams['concatenate'] == '2d':
+            total_mean = -0.5041
+            total_std = 0.2378
+        else:
+            if rparams['image_type'] == 'color':
+                total_mean = ([0.4292, 0.1894, 0.1048])
+                total_std = ([0.2798, 0.1336, 0.0811])
 
-        elif rparams['image_type'] == 'octa_3x3_sup':
-            total_mean = 0.2622
-            total_std = 0.1776
+            elif rparams['image_type'] == 'octa_3x3_sup':
+                total_mean = 0.2622
+                total_std = 0.1776
 
-        elif rparams['image_type'] == 'octa_3x3_deep':
-            total_mean = 0.1868
-            total_std = 0.1087
+            elif rparams['image_type'] == 'octa_3x3_deep':
+                total_mean = 0.1868
+                total_std = 0.1087
 
-        elif rparams['image_type'] == 'octa_6x6_sup':
-            total_mean = 0.3539
-            total_std = 0.1409
+            elif rparams['image_type'] == 'octa_6x6_sup':
+                total_mean = 0.3539
+                total_std = 0.1409
 
-        elif rparams['image_type'] == 'octa_6x6_deep':
-            total_mean = 0.2465
-            total_std = 0.0847
+            elif rparams['image_type'] == 'octa_6x6_deep':
+                total_mean = 0.2465
+                total_std = 0.0847
 
-        elif rparams['image_type'] == 'macular':
-            total_mean = ([0.0895, 0.2247, 0.2095])
-            total_std = ([0.1765, 0.2882, 0.1578])
+            elif rparams['image_type'] == 'macular':
+                total_mean = ([0.0895, 0.2247, 0.2095])
+                total_std = ([0.1765, 0.2882, 0.1578])
 
     normalize_transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(mean=total_mean, std=total_std)
     ])
 
-    print('Splitting dataset into train/val (75/25)...')
-    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0, train_size=.75, shuffle=True)
-
+    # print('Splitting dataset into train/val (90/10)...')
+    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=11, train_size=.70, shuffle=True, stratify=y)
+    #
     X_train, Y_train = get_data_concat(X_train, y_train)
     X_test, Y_test = get_data_concat(X_test, y_test)
-
-    train_dataset = MaratoCustomDataset(X_train, Y_train, normalize_transform, rparams['image_type'])  #TODO data aug goes here
-    plot.plot_samples(train_dataset)
-
-    test_dataset = MaratoCustomDataset(X_test, Y_test, normalize_transform, rparams['image_type'])
-
-    dataset = {'train': train_dataset, 'val': test_dataset}
+    #
+    train_dataset = MaratoCustomDataset(X_train, Y_train, normalize_transform,
+                                        rparams['image_type'], input_size, augment_individual_images=True)  # TODO data aug goes here
+    # plot.plot_samples(train_dataset)
+    #
+    test_dataset = MaratoCustomDataset(X_test, Y_test, normalize_transform, rparams['image_type'], input_size, augment_individual_images=False)
+    #
+    dataset = {'train': train_dataset, 'test': test_dataset}
+    # dataset = MaratoCustomDataset(X_init, y_init, normalize_transform, rparams['image_type'], input_size) # TODO data aug goes here
     print('Dataset created. Data is ready!')
     return dataset
 
@@ -356,23 +379,34 @@ def main():
 
     X, y = get_data(annotations_path)
 
-    dataset = create_dataset(X, y)
+    model_ft, input_size = initialize_model(rparams['model_name'], rparams['feature_extracting'], num_classes=2)
+    # print(model_ft)
+
+    dataset = create_dataset(X, y, input_size)
 
     if rparams['do_train']:
-        data_loaders = get_dataloaders(dataset)
-
-        model_ft, input_size = initialize_model(rparams['model_name'], rparams['feature_extracting'])
-        print(model_ft)
         optimizer_ft, criterion, scheduler = get_optimizer_and_loss(model_ft, dataset['train'])
+        # optimizer_ft, criterion, scheduler = get_optimizer_and_loss(model_ft, dataset)
 
-        model, train_loss, train_f1, train_auc, val_loss, val_f1, val_auc = train_model(model_ft, data_loaders,
-                                                                                          criterion,
-                                                                                          optimizer_ft, scheduler, dev,
-                                                                                          hparams['num_epochs'])
+        # data_loaders = get_dataloaders(dataset)
+        data_loaders = 0  # Canvi degut a que estem creant els dataloaders dins de train per fer kfold cros vala
+
+        model, train_loss, train_auc, val_loss, val_auc = train_model(dataset, optimizer_ft, dev,
+                                                                      hparams['num_epochs'],
+                                                                      rparams['model_name'] == "inception")
 
     if rparams['do_train'] and rparams['plot_curves']:
-        plot_losses(train_loss, train_f1, train_auc, val_loss, val_f1, val_auc)
+        plot_losses(train_loss, train_auc, val_loss, val_auc)
+
+    if rparams['do_test']:
+        from train.test_model import test_model
+        try:
+            test_model(dataset['test'], dev, model)
+        except:
+            test_model(dataset['test'], dev)
 
 
 if __name__ == '__main__':
+    CUDA_LAUNCH_BLOCKING = 1
+
     main()

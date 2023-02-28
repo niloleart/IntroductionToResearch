@@ -6,7 +6,9 @@ import torch
 class PlotUtils():
     idx = []
     num_rows = 5
+    # num_rows = 1
     num_cols = 2
+    # num_cols = 1
     total = num_rows * num_cols + 1
 
     def __init__(self, data):
@@ -17,6 +19,7 @@ class PlotUtils():
             self.data = data
 
         figure = plt.figure(figsize=(8, 12))
+        # figure = plt.figure(figsize=(1, 1))
         for i in range(1, self.total):
             sample_idx = torch.randint(len(self.data), size=(1,)).item()
             img, label_not_one_hot, label, folder = self.data[sample_idx]
@@ -44,23 +47,40 @@ class PlotUtils():
             return 'Ill'
 
 
-def plot_losses(train_loss, train_f1, train_auc, val_loss, val_f1, val_auc):
-    epochs = range(len(train_f1))
-    plt.plot(epochs, train_f1, 'b', label='Training F1-score')
-    plt.plot(epochs, val_f1, 'r', label='Validation F1-score')
-    plt.title('Training and validation F1-scores')
-    plt.legend()
-    plt.figure()
+def plot_losses(train_loss, train_auc, val_loss, val_auc):
 
-    plt.plot(epochs, train_loss, 'b', label='Training Loss')
-    plt.plot(epochs, val_loss, 'r', label='Validation Loss')
-    plt.title('Training and validation losses')
-    plt.legend()
-    plt.figure()
+    fig1, (ax1, ax2) = plt.subplots(2, 1)
+    ax1.plot(train_loss[0], label='Train loss fold 1', linestyle="--")
+    ax1.plot(train_loss[1], label='Train loss fold 2', linestyle="-.")
+    ax1.plot(train_loss[2], label='Train loss fold 3', linestyle=":")
+    avg_train_loss = np.average(train_loss, axis=0)
+    ax1.plot(avg_train_loss, label='Average train loss', linestyle="-")
+    ax1.legend()
 
-    plt.plot(epochs, train_auc, 'b', label='Training AUC')
-    plt.plot(epochs, val_auc, 'r', label='Validation AUC')
-    plt.title('Training and validation AUROC')
-    plt.legend()
+    ax2.plot(val_loss[0], label='val loss fold 1', linestyle="--")
+    ax2.plot(val_loss[1], label='val loss fold 2', linestyle="-.")
+    ax2.plot(val_loss[2], label='val loss fold 3', linestyle=":")
+    avg_train_loss = np.average(val_loss, axis=0)
+    ax2.plot(avg_train_loss, label='Average val loss', linestyle="-")
+    ax2.legend()
+
+    fig2, (ax3, ax4) = plt.subplots(2, 1)
+    ax3.plot(train_auc[0], label='Train auc fold 1', linestyle="--")
+    ax3.plot(train_auc[1], label='Train auc fold 2', linestyle="-.")
+    ax3.plot(train_auc[2], label='Train auc fold 3', linestyle=":")
+    avg_train_auc = np.average(train_auc, axis=0)
+    ax3.plot(avg_train_auc, label='Average train auc', linestyle="-")
+    ax3.legend()
+
+    ax4.plot(val_auc[0], label='val auc fold 1', linestyle="--")
+    ax4.plot(val_auc[1], label='val auc fold 2', linestyle="-.")
+    ax4.plot(val_auc[2], label='val auc fold 3', linestyle=":")
+    avg_val_auc = np.average(val_auc, axis=0)
+    ax4.plot(avg_val_auc, label='Average val auc', linestyle="-")
+    ax4.legend()
 
     plt.show()
+
+    plt.show()
+
+

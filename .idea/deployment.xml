@@ -1,7 +1,238 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="niloleart@147.83.54.20:22 password (4)" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="niloleart@147.83.208.165:22 agent (33)" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
+      <paths name="niloleart@147.83.208.165:22 agent">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_554" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (10)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_846" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (11)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_367" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (12)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_952" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (13)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_447" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (14)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_526" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (15)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_914" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (16)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_799" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (17)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_146" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (18)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_896" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (19)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_173" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (2)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_745" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (20)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_658" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (21)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_599" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (22)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_342" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (23)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_757" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (24)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_773" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (25)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_805" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (26)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_357" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (27)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/niloleart/pycharm_projects/projecte" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (28)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_891" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (29)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/niloleart/pycharm_projects/projecte" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (3)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_131" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (30)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_944" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (31)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_550" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (32)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/niloleart/pycharm_projects/projecte" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (33)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/niloleart/pycharm_projects/projecte" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (4)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_509" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (5)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_395" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (6)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_472" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (7)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_580" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (8)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_874" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="niloleart@147.83.208.165:22 agent (9)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_994" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="niloleart@147.83.54.20:22 password">
         <serverdata>
           <mappings>

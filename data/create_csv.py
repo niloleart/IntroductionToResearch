@@ -38,7 +38,7 @@ experiments = {
     'R-DR_diagnosis': 2
 }
 
-experiment = experiments['DM_diagnosis']
+experiment = experiments['R-DR_diagnosis']  # Change Experiment here!
 
 
 
@@ -80,7 +80,7 @@ def write_csv(labels_left, labels_right, macular_left_eye_paths, macular_right_e
         f, writer = get_writer(local_mode)
         writer.writerow(header)
         for index, label in enumerate(labels_right):
-            if not experiment == experiments['R-DR_diagnosis']:
+            if not experiment == experiments['DM_diagnosis']: # NO PUTO TOCAR, SUBNORMAL!
                 if label != 0:
                     writer.writerow([macular_left_eye_paths[index], macular_right_eyes_paths[index],
                                      color_left_eyes_paths[index], color_right_eyes_paths[index],
